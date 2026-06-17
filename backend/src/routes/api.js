@@ -594,6 +594,7 @@ router.get('/games/:id/console', authenticateToken, gameController.getConsoleCon
 // ROTAS DE MONITORAMENTO E SEGURANÇA (Protegidas)
 // ==========================================
 router.get('/monitor/logs', authenticateToken, monitorController.getLogs);
+router.post('/monitor/log-client-error', monitorController.logClientError);
 router.get('/monitor/security', authenticateToken, monitorController.getSecurityStatus);
 router.post('/monitor/firewall', authenticateToken, monitorController.toggleFirewallPort);
 router.get('/monitor/firewall/rules', authenticateToken, monitorController.getFirewallRules);

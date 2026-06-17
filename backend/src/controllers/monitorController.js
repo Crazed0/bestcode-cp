@@ -220,7 +220,7 @@ async function readLastLinesOfFile(filePath, maxLines = 100) {
  * Carregar logs selecionados pelo painel
  */
 async function getLogs(req, res) {
-  const { type } = req.query; // 'nginx-access', 'nginx-error', 'mail', 'panel'
+  const { type } = req.query; // 'nginx-access', 'nginx-error', 'mail', 'panel', 'syslog', 'auth', 'mysql', 'client-errors'
 
   let logPath = '';
   if (isLinux) {
@@ -229,6 +229,25 @@ async function getLogs(req, res) {
       case 'nginx-error': logPath = '/var/log/nginx/error.log'; break;
       case 'mail': logPath = '/var/log/mail.log'; break;
       case 'panel': logPath = path.resolve(__dirname, '../../temp/panel.log'); break; // custom log
+      case 'syslog': logPath = '/var/log/syslog'; break;
+      case 'auth': logPath = '/var/log/auth.log'; break;
+      case 'mysql': {
+        const mysqlPaths = [
+          '/var/log/mysql/error.log',
+          '/var/log/mysql.err',
+          '/var/log/mariadb/mariadb.log'
+        ];
+        logPath = mysqlPaths[0];
+        for (const p of mysqlPaths) {
+          try {
+            await fs.access(p);
+            logPath = p;
+            break;
+          } catch(e) {}
+        }
+        break;
+      }
+      case 'client-errors': logPath = path.resolve(__dirname, '../../temp/client-errors.log'); break;
       default: return res.status(400).json({ error: 'Tipo de log inválido.' });
     }
   } else {
@@ -252,6 +271,26 @@ async function getLogs(req, res) {
       case 'panel':
         logPath = path.join(mockLogDir, 'panel.log');
         await fs.writeFile(logPath, '[2026-06-16 22:15:00] INFO: BestCode CP backend started on port 3000\n[2026-06-16 22:15:30] INFO: SSO session token created for admin', 'utf8');
+        break;
+      case 'syslog':
+        logPath = path.join(mockLogDir, 'syslog.log');
+        await fs.writeFile(logPath, 'Jun 16 22:15:00 server systemd[1]: Started BestCode Control Panel Backend Agent.\nJun 16 22:15:05 server systemd[1]: Started MariaDB database server.', 'utf8');
+        break;
+      case 'auth':
+        logPath = path.join(mockLogDir, 'auth.log');
+        await fs.writeFile(logPath, 'Jun 16 22:15:00 server sshd[2448]: Accepted publickey for root from 192.168.1.50 port 54321 ssh2', 'utf8');
+        break;
+      case 'mysql':
+        logPath = path.join(mockLogDir, 'mysql-error.log');
+        await fs.writeFile(logPath, '2026-06-16 22:15:00 0 [Note] Starting MariaDB 10.11.3-MariaDB source revision...', 'utf8');
+        break;
+      case 'client-errors':
+        logPath = path.resolve(__dirname, '../../temp/client-errors.log');
+        try {
+          await fs.access(logPath);
+        } catch (e) {
+          await fs.writeFile(logPath, '[16/06/2026 22:15:00] CLIENT-ERROR: Uncaught TypeError: Cannot read properties of undefined | Source: app.js:123', 'utf8');
+        }
         break;
       default:
         return res.status(400).json({ error: 'Tipo de log inválido.' });
@@ -429,6 +468,22 @@ async function deleteFirewallRule(req, res) {
   }
 }
 
+async function logClientError(req, res) {
+  const { message, source, lineno, colno, stack, url, userAgent } = req.body;
+  const timestamp = new Date().toLocaleString('pt-PT');
+  const logLine = `[${timestamp}] CLIENT-ERROR: ${message || 'No message'} | Source: ${source || 'Unknown'}:${lineno || 0}:${colno || 0} | URL: ${url || 'Unknown'} | UA: ${userAgent || 'Unknown'}\n${stack ? `Stack: ${stack}\n` : ''}`;
+
+  try {
+    const logDir = path.resolve(__dirname, '../../temp');
+    await fs.mkdir(logDir, { recursive: true });
+    const logPath = path.join(logDir, 'client-errors.log');
+    await fs.appendFile(logPath, logLine, 'utf8');
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao registar log de erro: ' + error.message });
+  }
+}
+
 module.exports = {
   getSystemMetrics,
   getLatestMetrics,
@@ -437,5 +492,6 @@ module.exports = {
   getSecurityStatus,
   toggleFirewallPort,
   getFirewallRules,
-  deleteFirewallRule
+  deleteFirewallRule,
+  logClientError
 };

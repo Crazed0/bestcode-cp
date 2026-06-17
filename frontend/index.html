@@ -5,6 +5,45 @@
     if (!localStorage.getItem('bcp_token')) {
       window.location.replace('/login');
     }
+    
+    // Captura global de erros no frontend e envio para o backend
+    window.addEventListener('error', function(event) {
+      try {
+        const errorData = {
+          message: event.message,
+          source: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+          stack: event.error ? event.error.stack : '',
+          url: window.location.href,
+          userAgent: navigator.userAgent
+        };
+        fetch('/api/monitor/log-client-error', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(errorData)
+        }).catch(function() {});
+      } catch(e) {}
+    });
+
+    window.addEventListener('unhandledrejection', function(event) {
+      try {
+        const errorData = {
+          message: 'Unhandled Promise Rejection: ' + (event.reason ? event.reason.message || event.reason : 'No reason'),
+          source: 'Promise',
+          lineno: 0,
+          colno: 0,
+          stack: event.reason && event.reason.stack ? event.reason.stack : '',
+          url: window.location.href,
+          userAgent: navigator.userAgent
+        };
+        fetch('/api/monitor/log-client-error', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(errorData)
+        }).catch(function() {});
+      } catch(e) {}
+    });
   </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -760,6 +799,10 @@
                 <option value="nginx-error">Nginx Error Log</option>
                 <option value="mail">Servidor de E-mail</option>
                 <option value="panel">Logs do Painel BCP</option>
+                <option value="syslog">Logs do Sistema (Syslog)</option>
+                <option value="auth">Logs de Autenticação/Segurança (Auth)</option>
+                <option value="mysql">Logs da Base de Dados (MariaDB/MySQL)</option>
+                <option value="client-errors">Erros do Navegador (Client-Side)</option>
               </select>
             </div>
           </div>
