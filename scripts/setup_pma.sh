@@ -83,6 +83,7 @@ server {
     index index.html;
 
     include snippets/phpmyadmin.conf;
+    include snippets/roundcube.conf;
 
     # Cabeçalhos de Segurança (Security Headers)
     add_header X-Frame-Options "DENY" always;

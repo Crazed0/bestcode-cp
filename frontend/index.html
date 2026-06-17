@@ -591,7 +591,11 @@
           </div>
           <div style="display: flex; gap: 12px; align-items: center;">
             <input type="text" id="email-search" class="form-input" placeholder="🔍 Procurar e-mail..." oninput="filterEmailsList()" style="width: 200px; font-size: 13px; height: 38px;">
-            <button class="btn-primary" onclick="openModal('modal-create-email')">
+            <a href="/webmail" target="_blank" class="btn-secondary" style="text-decoration: none; height: 38px; box-sizing: border-box; display: inline-flex; align-items: center; white-space: nowrap;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              Aceder ao Webmail
+            </a>
+            <button class="btn-primary" onclick="openModal('modal-create-email')" style="white-space: nowrap;">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
               Nova Conta
             </button>

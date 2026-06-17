@@ -201,6 +201,36 @@ PANEL_NGINX="/etc/nginx/sites-available/bestcode-cp"
 if [ -f "$PANEL_NGINX" ]; then
   echo "Atualizando a configuração do Nginx do painel com cabeçalhos de segurança e correção de loops..."
   
+  # Garanta que o snippet do Roundcube existe e está correto
+  cat <<EOF > /etc/nginx/snippets/roundcube.conf
+location /webmail {
+    alias /var/lib/roundcube/;
+    index index.php index.html index.htm;
+    location ~ ^/webmail/(config|temp|logs)/ {
+        deny all;
+    }
+    location ~ ^/webmail/(.+\.php)$ {
+        alias /var/lib/roundcube/\$1;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME \$request_filename;
+        include fastcgi_params;
+    }
+    location ~* ^/webmail/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
+        alias /var/lib/roundcube/\$1;
+    }
+}
+location /roundcube {
+    return 301 /webmail;
+}
+EOF
+
+  # Inicia serviço FPM se necessário para gerar o socket e detecta o socket correto
+  PHP_FPM_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
+  if [ -n "$PHP_FPM_SOCK" ]; then
+      sed -i "s|fastcgi_pass unix:/run/php/php-fpm.sock;|fastcgi_pass unix:$PHP_FPM_SOCK;|" /etc/nginx/snippets/roundcube.conf 2>/dev/null || true
+  fi
+  
   # 1. Extrai o domínio (server_name) atual configurado
   CURRENT_DOMAINS=$(grep -E "^\s*server_name" "$PANEL_NGINX" | head -n 1 | sed 's/server_name//g' | tr -d ';')
   CURRENT_DOMAINS=$(echo "$CURRENT_DOMAINS" | xargs) # trim
@@ -255,6 +285,7 @@ server {
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ws: wss: https://api.github.com https://raw.githubusercontent.com; frame-src https://accounts.google.com;" always;
 
     include snippets/phpmyadmin.conf;
+    include snippets/roundcube.conf;
 
     # Redireciona acessos diretos a .html no browser para URL limpa (evita loop interno)
     if (\$request_uri ~* "/login\.html") {
@@ -316,6 +347,7 @@ server {
     add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ws: wss: https://api.github.com https://raw.githubusercontent.com; frame-src https://accounts.google.com;" always;
 
     include snippets/phpmyadmin.conf;
+    include snippets/roundcube.conf;
 
     if (\$request_uri ~* "/login\.html") {
         return 301 /login;
@@ -363,6 +395,7 @@ server {
     index index.html;
 
     include snippets/phpmyadmin.conf;
+    include snippets/roundcube.conf;
 
     # Redireciona acessos diretos a .html no browser para URL limpa (evita loop interno)
     if (\$request_uri ~* "/login\.html") {

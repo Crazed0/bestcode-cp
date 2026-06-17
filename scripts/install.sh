@@ -224,12 +224,37 @@ location ${PMA_PATH} {
 }
 EOF
 
+# Cria arquivo de bloco de servidor Nginx para o Roundcube Webmail global (/webmail)
+cat <<EOF > /etc/nginx/snippets/roundcube.conf
+location /webmail {
+    alias /var/lib/roundcube/;
+    index index.php index.html index.htm;
+    location ~ ^/webmail/(config|temp|logs)/ {
+        deny all;
+    }
+    location ~ ^/webmail/(.+\.php)$ {
+        alias /var/lib/roundcube/\$1;
+        fastcgi_pass unix:/run/php/php-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME \$request_filename;
+        include fastcgi_params;
+    }
+    location ~* ^/webmail/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
+        alias /var/lib/roundcube/\$1;
+    }
+}
+location /roundcube {
+    return 301 /webmail;
+}
+EOF
+
 # Inicia serviço FPM se necessário para gerar o socket
 systemctl start php8.2-fpm || systemctl start php-fpm || true
 PHP_FPM_SOCK=$(ls /run/php/php*-fpm.sock | head -n 1)
 if [ -n "$PHP_FPM_SOCK" ]; then
     echo -e "FPM Socket encontrado: $PHP_FPM_SOCK"
     sed -i "s|fastcgi_pass unix:/run/php/php-fpm.sock;|fastcgi_pass unix:$PHP_FPM_SOCK;|" /etc/nginx/snippets/phpmyadmin.conf
+    sed -i "s|fastcgi_pass unix:/run/php/php-fpm.sock;|fastcgi_pass unix:$PHP_FPM_SOCK;|" /etc/nginx/snippets/roundcube.conf 2>/dev/null || true
 else
     echo -e "AVISO: Socket PHP-FPM não foi encontrado."
 fi
@@ -254,6 +279,7 @@ server {
     index index.html;
 
     include snippets/phpmyadmin.conf;
+    include snippets/roundcube.conf;
 
     # Backend API e WebSocket Proxy
     location /api {

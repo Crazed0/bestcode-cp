@@ -46,6 +46,7 @@ server {
     index index.html;
 
     include snippets/phpmyadmin.conf;
+    include snippets/roundcube.conf;
 
     # Backend API e WebSocket Proxy
     location /api {
@@ -55,6 +56,9 @@ server {
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host \$host;
         proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     # Redireciona acessos diretos a .html no browser para URL limpa (evita loop interno)
