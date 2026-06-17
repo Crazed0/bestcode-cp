@@ -265,7 +265,7 @@
     function saveAuthAndRedirect(data) {
       localStorage.setItem('bcp_token', data.token);
       localStorage.setItem('bcp_username', data.username);
-      localStorage.setItem('bcp_role', data.role);
+      localStorage.setItem('bcp_role', data.role ? data.role.toLowerCase() : '');
       window.location.href = '/';
     }
 

@@ -1055,8 +1055,8 @@ router.post('/system/update', authenticateToken, (req, res) => {
       return res.status(404).json({ error: 'Script de atualização não encontrado no host.' });
     }
 
-    // Executa o script em background de forma desconectada
-    const child = spawn('bash', [scriptPath], {
+    // Executa o script em background de forma desconectada via sudo
+    const child = spawn('sudo', [scriptPath], {
       detached: true,
       stdio: 'ignore'
     });

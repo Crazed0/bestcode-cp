@@ -100,7 +100,7 @@ if [ "$1" != "--nginx-only" ]; then
   # Configura regras sudoers exclusivas para o utilizador bcp (garante permissões atualizadas)
   echo "Atualizando regras sudoers para o utilizador bcp..."
   cat <<EOF > /etc/sudoers.d/bestcode-cp
-bcp ALL=(ALL) NOPASSWD: /usr/sbin/ufw, /sbin/ufw, /usr/bin/fail2ban-client, /usr/bin/certbot, /usr/bin/systemctl, /bin/systemctl, /usr/sbin/nginx, /usr/bin/mysql, /usr/bin/mariadb, /usr/bin/chown, /bin/chown, /usr/bin/rm, /bin/rm, /usr/bin/crontab, /usr/bin/ln, /bin/ln, /bin/bash, /usr/bin/bash, /usr/bin/pkill, /bin/pkill, /bin/kill, /usr/bin/kill
+bcp ALL=(ALL) NOPASSWD: /usr/sbin/ufw, /sbin/ufw, /usr/bin/fail2ban-client, /usr/bin/certbot, /usr/bin/systemctl, /bin/systemctl, /usr/sbin/nginx, /usr/bin/mysql, /usr/bin/mariadb, /usr/bin/chown, /bin/chown, /usr/bin/rm, /bin/rm, /usr/bin/crontab, /usr/bin/ln, /bin/ln, /bin/bash, /usr/bin/bash, /usr/bin/pkill, /bin/pkill, /bin/kill, /usr/bin/kill, /opt/bestcode-cp/scripts/update.sh
 EOF
   chmod 440 /etc/sudoers.d/bestcode-cp
 

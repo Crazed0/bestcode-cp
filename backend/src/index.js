@@ -229,7 +229,7 @@ wss.on('connection', (ws, request, user) => {
 
         const isWin = process.platform === 'win32';
         const shell = isWin ? 'powershell.exe' : 'sudo';
-        const args = isWin ? ['-NoLogo'] : ['bash'];
+        const args = isWin ? ['-NoLogo'] : ['/bin/bash'];
 
         console.log(`[WS] Cliente conectou ao console de root`);
         activeShell = spawn(shell, args, {
