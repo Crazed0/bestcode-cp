@@ -217,6 +217,7 @@ async function createSite(req, res) {
 
     <!-- Script com type="text/babel" para suportar JSX -->
     <script type="text/babel">
+        /** @jsxRuntime classic */
         function App() {
             const [clicks, setClicks] = React.useState(0);
 
