@@ -17,7 +17,7 @@ ssh root@your.server.ip
 ### Step 2: Download the Installer
 Download the automated installation script:
 ```bash
-wget https://raw.githubusercontent.com/username/bestcode-cp/main/scripts/install.sh -O bcp-install.sh
+wget https://raw.githubusercontent.com/Crazed0/bestcode-cp/main/scripts/install.sh -O bcp-install.sh
 ```
 
 *If the download fails due to an SSL certificate error, ensure you have the `ca-certificates` package installed on your system:*
