@@ -689,34 +689,43 @@ window.openSslModal = function(id, domain) {
 
   const overlay = document.createElement('div');
   overlay.id = 'ssl-modal-overlay';
-  overlay.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;';
+  overlay.className = 'modal-overlay active';
+  overlay.style.zIndex = '9999'; // Ensure it covers everything
   overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
 
   overlay.innerHTML = `
-    <div class="glass-card" style="max-width:640px; width:100%; max-height:90vh; overflow-y:auto; padding:28px; border:1px solid rgba(255,255,255,0.1); background:rgba(18,19,23,0.98);">
-      <h2 style="color:#fff; font-size:18px; margin:0 0 4px 0;">Ativar SSL para <span style="color:var(--accent-blue, #00d2ff);">${domain}</span></h2>
-      <p style="color:rgba(255,255,255,0.5); font-size:13px; margin:0 0 24px 0;">Escolhe o método de certificado HTTPS.</p>
-
-      <div style="border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:18px; margin-bottom:18px;">
-        <h3 style="color:#fff; font-size:14px; margin:0 0 6px 0;">⚡ Let's Encrypt (automático)</h3>
-        <p style="color:rgba(255,255,255,0.45); font-size:12px; margin:0 0 14px 0;">Emite um certificado grátis via Certbot. <strong>Requer o proxy da Cloudflare DESLIGADO (nuvem cinzenta)</strong> e o registo A a apontar para este servidor.</p>
-        <button class="btn-secondary" style="width:100%; justify-content:center;" onclick="document.getElementById('ssl-modal-overlay').remove(); toggleSSL(${id});">Emitir com Let's Encrypt</button>
+    <div class="modal-box modal-large">
+      <div class="modal-header">
+        <h3 class="modal-title">Ativar SSL para <span style="color:var(--accent-blue, #00d2ff);">${domain}</span></h3>
+        <button class="modal-close" onclick="document.getElementById('ssl-modal-overlay').remove();">&times;</button>
       </div>
+      <div class="modal-body">
+        <p style="color:rgba(255,255,255,0.5); font-size:13px; margin:0 0 16px 0;">Escolha o método de certificado HTTPS.</p>
 
-      <div style="border:1px solid rgba(255,183,0,0.25); border-radius:10px; padding:18px; background:rgba(255,183,0,0.03);">
-        <h3 style="color:#ffb700; font-size:14px; margin:0 0 6px 0;">🟠 Cloudflare Origin Certificate</h3>
-        <p style="color:rgba(255,255,255,0.45); font-size:12px; margin:0 0 14px 0;">Funciona com o proxy da Cloudflare LIGADO. Na Cloudflare: SSL/TLS → Origin Server → Create Certificate, e cola aqui. Depois define o modo SSL/TLS como <strong>Full (strict)</strong>.</p>
+        <div style="border:1px solid rgba(255,255,255,0.08); border-radius:10px; padding:18px; margin-bottom:18px;">
+          <h3 style="color:#fff; font-size:14px; margin:0 0 6px 0;">⚡ Let's Encrypt (automático)</h3>
+          <p style="color:rgba(255,255,255,0.45); font-size:12px; margin:0 0 14px 0;">Emite um certificado grátis via Certbot. <strong>Requer o proxy da Cloudflare DESLIGADO (nuvem cinzenta)</strong> e o registo A a apontar para este servidor.</p>
+          <button class="btn-secondary" style="width:100%; justify-content:center;" onclick="document.getElementById('ssl-modal-overlay').remove(); toggleSSL(${id});">Emitir com Let's Encrypt</button>
+        </div>
 
-        <label style="color:rgba(255,255,255,0.6); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:6px;">Origin Certificate (PEM)</label>
-        <textarea id="cf-cert" class="form-input" rows="6" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" style="width:100%; box-sizing:border-box; font-family:var(--font-mono); font-size:11px; margin-bottom:14px; resize:vertical;"></textarea>
+        <div style="border:1px solid rgba(255,183,0,0.25); border-radius:10px; padding:18px; background:rgba(255,183,0,0.03); display:flex; flex-direction:column; gap:12px;">
+          <h3 style="color:#ffb700; font-size:14px; margin:0 0 2px 0;">🟠 Cloudflare Origin Certificate</h3>
+          <p style="color:rgba(255,255,255,0.45); font-size:12px; margin:0 0 4px 0;">Funciona com o proxy da Cloudflare LIGADO. Na Cloudflare: SSL/TLS → Origin Server → Create Certificate, e cola aqui. Depois define o modo SSL/TLS como <strong>Full (strict)</strong>.</p>
 
-        <label style="color:rgba(255,255,255,0.6); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:6px;">Private Key (PEM)</label>
-        <textarea id="cf-key" class="form-input" rows="6" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" style="width:100%; box-sizing:border-box; font-family:var(--font-mono); font-size:11px; margin-bottom:16px; resize:vertical;"></textarea>
+          <div>
+            <label style="color:rgba(255,255,255,0.6); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:6px;">Origin Certificate (PEM)</label>
+            <textarea id="cf-cert" class="form-input" rows="5" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----" style="width:100%; box-sizing:border-box; font-family:var(--font-mono); font-size:11px; resize:vertical;"></textarea>
+          </div>
 
-        <button class="btn-primary" id="cf-submit-btn" style="width:100%; justify-content:center;" onclick="submitCloudflareSSL(${id})">Ativar com Cloudflare Origin</button>
+          <div>
+            <label style="color:rgba(255,255,255,0.6); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; display:block; margin-bottom:6px;">Private Key (PEM)</label>
+            <textarea id="cf-key" class="form-input" rows="5" placeholder="-----BEGIN PRIVATE KEY-----&#10;...&#10;-----END PRIVATE KEY-----" style="width:100%; box-sizing:border-box; font-family:var(--font-mono); font-size:11px; resize:vertical;"></textarea>
+          </div>
+
+          <button class="btn-primary" id="cf-submit-btn" style="width:100%; justify-content:center; margin-top:4px;" onclick="submitCloudflareSSL(${id})">Ativar com Cloudflare Origin</button>
+        </div>
       </div>
-
-      <div style="text-align:right; margin-top:16px;">
+      <div class="modal-footer">
         <button class="btn-secondary" onclick="document.getElementById('ssl-modal-overlay').remove();">Cancelar</button>
       </div>
     </div>
