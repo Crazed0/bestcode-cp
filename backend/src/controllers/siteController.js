@@ -2,7 +2,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const db = require('../config/db');
-const { execCommand, restartService, getSystemPath, isLinux } = require('../services/systemService');
+const { execCommand, restartService, reloadService, getSystemPath, isLinux } = require('../services/systemService');
 
 /**
  * Detecta dinamicamente a socket PHP-FPM ativa no sistema
@@ -453,7 +453,7 @@ if __name__ == "__main__":
     // 4. Criar link simbólico para ativar o site (apenas no Linux)
     if (isLinux) {
       await execCommand(`ln -sf "${nginxAvailPath}" "${nginxEnabledPath}"`);
-      await restartService('nginx');
+      await reloadService('nginx');
     } else {
       // Simulação no Windows (escreve o arquivo na pasta enabled também)
       await fs.writeFile(nginxEnabledPath, nginxConfig, 'utf8');
@@ -503,9 +503,9 @@ async function deleteSite(req, res) {
       await fs.unlink(nginxEnabledPath);
     } catch (e) {}
 
-    // 2. Reiniciar o Nginx
+    // 2. Recarregar o Nginx
     if (isLinux) {
-      await restartService('nginx');
+      await reloadService('nginx');
     }
 
     // 3. Remover arquivos do site (Opcional: movemos para uma pasta backup ou excluímos)
@@ -563,7 +563,7 @@ async function toggleSSL(req, res) {
       }
 
       if (isLinux) {
-        await restartService('nginx');
+        await reloadService('nginx');
       }
 
       db.prepare('UPDATE sites SET ssl_enabled = 0, ssl_type = NULL WHERE id = ?').run(id);
@@ -642,7 +642,7 @@ async function enableCloudflareSSL(req, res) {
       if (test.error) {
         return res.status(500).json({ error: 'Configuração do Nginx inválida: ' + (test.stderr || test.error.message) });
       }
-      await restartService('nginx');
+      await reloadService('nginx');
     }
 
     db.prepare("UPDATE sites SET ssl_enabled = 1, ssl_type = 'cloudflare' WHERE id = ?").run(id);
@@ -687,12 +687,12 @@ async function saveSiteConfig(req, res) {
     await fs.writeFile(nginxAvailPath, content, 'utf8');
 
     if (isLinux) {
-      // Testa a configuração antes de reiniciar para evitar derrubar o servidor
+      // Testa a configuração antes de recarregar para evitar derrubar o servidor
       const testResult = await execCommand('nginx -t');
       if (testResult.error) {
         throw new Error('Configuração do Nginx inválida: ' + testResult.stderr);
       }
-      await restartService('nginx');
+      await reloadService('nginx');
     }
 
     res.json({ message: 'Configuração do Nginx salva e recarregada com sucesso!' });

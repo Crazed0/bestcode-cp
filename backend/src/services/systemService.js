@@ -88,6 +88,23 @@ async function restartService(serviceName) {
 }
 
 /**
+ * Recarrega a configuração de um serviço (graceful reload)
+ */
+async function reloadService(serviceName) {
+  if (isLinux) {
+    const result = await execCommand(`systemctl reload ${serviceName}`);
+    if (result.error) {
+      // Se falhar o reload (ex: serviço não suporta), faz restart como fallback
+      return restartService(serviceName);
+    }
+    return true;
+  } else {
+    console.log(`[MOCK RELOAD] Serviço: ${serviceName}`);
+    return true;
+  }
+}
+
+/**
  * Retorna o caminho real ou o mock para configurações
  */
 function getSystemPath(type, domain = '') {
@@ -114,6 +131,7 @@ module.exports = {
   isLinux,
   execCommand,
   restartService,
+  reloadService,
   getSystemPath,
   MOCK_DIRS
 };
