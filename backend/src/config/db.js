@@ -100,6 +100,11 @@ try {
   db.exec("ALTER TABLE sites ADD COLUMN app_port INTEGER DEFAULT NULL;");
 } catch (e) {}
 
+// Adiciona coluna ssl_type de forma segura ('letsencrypt' | 'cloudflare')
+try {
+  db.exec("ALTER TABLE sites ADD COLUMN ssl_type TEXT DEFAULT NULL;");
+} catch (e) {}
+
 // Adiciona coluna gmail de forma segura na tabela de utilizadores
 try {
   db.exec("ALTER TABLE users ADD COLUMN gmail TEXT DEFAULT NULL;");

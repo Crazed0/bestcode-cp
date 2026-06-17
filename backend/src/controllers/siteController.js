@@ -33,7 +33,7 @@ function getPhpSocket(phpVersion) {
 /**
  * Retorna template de configuração do Nginx para PHP/Estático/WordPress/React/Python
  */
-function getNginxTemplate(domain, rootPath, phpVersion, siteType, appPort) {
+function getNginxTemplate(domain, rootPath, phpVersion, siteType, appPort, sslOptions = null) {
   const phpSocket = getPhpSocket(phpVersion);
 
   let locationBlock = '';
@@ -86,12 +86,8 @@ function getNginxTemplate(domain, rootPath, phpVersion, siteType, appPort) {
     }`;
   }
 
-  return `server {
-    listen 80;
-    listen [::]:80;
-
-    server_name ${domain} www.${domain};
-    root ${rootPath};
+  // Diretivas partilhadas entre o bloco HTTP e o bloco HTTPS
+  const commonDirectives = `root ${rootPath};
     index ${indexFile};
 
     charset utf-8;
@@ -105,7 +101,40 @@ function getNginxTemplate(domain, rootPath, phpVersion, siteType, appPort) {
 
     location ~ /\\.(?!well-known).* {
         deny all;
-    }
+    }`;
+
+  // Com SSL (ex: Cloudflare Origin Certificate): redireciona HTTP->HTTPS e serve em 443
+  if (sslOptions && sslOptions.certPath && sslOptions.keyPath) {
+    return `server {
+    listen 80;
+    listen [::]:80;
+
+    server_name ${domain} www.${domain};
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+
+    server_name ${domain} www.${domain};
+
+    ssl_certificate ${sslOptions.certPath};
+    ssl_certificate_key ${sslOptions.keyPath};
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+
+    ${commonDirectives}
+}`;
+  }
+
+  // Sem SSL: apenas HTTP na porta 80
+  return `server {
+    listen 80;
+    listen [::]:80;
+
+    server_name ${domain} www.${domain};
+    ${commonDirectives}
 }`;
 }
 
@@ -518,7 +547,7 @@ async function toggleSSL(req, res) {
         }
       }
       
-      db.prepare('UPDATE sites SET ssl_enabled = 1 WHERE id = ?').run(id);
+      db.prepare("UPDATE sites SET ssl_enabled = 1, ssl_type = 'letsencrypt' WHERE id = ?").run(id);
       res.json({ message: 'SSL ativado com sucesso para ' + domain, ssl_enabled: 1 });
     } else {
       // Desativar SSL (reverter o Nginx para o template HTTP padrão)
@@ -526,15 +555,103 @@ async function toggleSSL(req, res) {
       const nginxConfig = getNginxTemplate(domain, site.root_path, site.php_version, site.site_type, site.app_port);
       await fs.writeFile(nginxAvailPath, nginxConfig, 'utf8');
 
+      // Remove certificados Cloudflare Origin previamente guardados, se existirem
+      if (site.ssl_type === 'cloudflare') {
+        const { certPath, keyPath } = getCertPaths(domain);
+        try { await fs.unlink(certPath); } catch (e) {}
+        try { await fs.unlink(keyPath); } catch (e) {}
+      }
+
       if (isLinux) {
         await restartService('nginx');
       }
 
-      db.prepare('UPDATE sites SET ssl_enabled = 0 WHERE id = ?').run(id);
+      db.prepare('UPDATE sites SET ssl_enabled = 0, ssl_type = NULL WHERE id = ?').run(id);
       res.json({ message: 'SSL desativado com sucesso (revertido para HTTP).', ssl_enabled: 0 });
     }
   } catch (error) {
     res.status(500).json({ error: 'Erro ao gerenciar SSL: ' + error.message });
+  }
+}
+
+/**
+ * Retorna os caminhos dos ficheiros de certificado/chave para um domínio.
+ */
+function getCertPaths(domain) {
+  const baseDir = isLinux
+    ? '/etc/ssl/bestcode'
+    : path.resolve(__dirname, '../../temp/etc/ssl/bestcode');
+  const safe = domain.replace(/[^a-zA-Z0-9.-]/g, '_');
+  return {
+    baseDir,
+    certPath: path.join(baseDir, `${safe}.pem`),
+    keyPath: path.join(baseDir, `${safe}.key`)
+  };
+}
+
+/**
+ * Ativar SSL com um Cloudflare Origin Certificate (ou qualquer cert PEM colado pelo utilizador).
+ * Funciona com o proxy da Cloudflare ligado (nuvem laranja), ao contrário do Let's Encrypt HTTP-01.
+ */
+async function enableCloudflareSSL(req, res) {
+  const { id, certificate, privateKey } = req.body;
+
+  if (!id || !certificate || !privateKey) {
+    return res.status(400).json({ error: 'ID do site, certificado e chave privada são obrigatórios.' });
+  }
+
+  // Validação básica do formato PEM para evitar gravar lixo e partir o Nginx
+  const cert = certificate.trim();
+  const key = privateKey.trim();
+  if (!cert.includes('BEGIN CERTIFICATE') || !cert.includes('END CERTIFICATE')) {
+    return res.status(400).json({ error: 'O certificado não parece um PEM válido (falta o bloco BEGIN/END CERTIFICATE).' });
+  }
+  if (!key.includes('BEGIN') || !key.includes('PRIVATE KEY')) {
+    return res.status(400).json({ error: 'A chave privada não parece um PEM válido (falta o bloco BEGIN PRIVATE KEY).' });
+  }
+
+  try {
+    const site = db.prepare('SELECT * FROM sites WHERE id = ?').get(id);
+    if (!site) {
+      return res.status(404).json({ error: 'Site não encontrado.' });
+    }
+
+    const domain = site.domain;
+    const { baseDir, certPath, keyPath } = getCertPaths(domain);
+
+    // Garante o diretório de certificados (no Windows/dev é criado em temp)
+    await fs.mkdir(baseDir, { recursive: true });
+
+    // Grava o certificado e a chave (newline final para o Nginx aceitar)
+    await fs.writeFile(certPath, cert + '\n', 'utf8');
+    await fs.writeFile(keyPath, key + '\n', 'utf8');
+    try { await fs.chmod(keyPath, 0o640); } catch (e) {}
+    try { await fs.chmod(certPath, 0o644); } catch (e) {}
+
+    // Escreve a configuração do Nginx com SSL apontando para os certs guardados
+    const nginxAvailPath = getSystemPath('nginx-avail', domain);
+    const nginxConfig = getNginxTemplate(
+      domain, site.root_path, site.php_version, site.site_type, site.app_port,
+      { certPath, keyPath }
+    );
+    await fs.writeFile(nginxAvailPath, nginxConfig, 'utf8');
+
+    // Testa a configuração antes de recarregar para não derrubar o Nginx
+    if (isLinux) {
+      const test = await execCommand('nginx -t');
+      if (test.error) {
+        return res.status(500).json({ error: 'Configuração do Nginx inválida: ' + (test.stderr || test.error.message) });
+      }
+      await restartService('nginx');
+    }
+
+    db.prepare("UPDATE sites SET ssl_enabled = 1, ssl_type = 'cloudflare' WHERE id = ?").run(id);
+    res.json({
+      message: 'SSL (Cloudflare Origin) ativado com sucesso para ' + domain + '. Define o modo SSL/TLS da Cloudflare como "Full (strict)".',
+      ssl_enabled: 1
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao ativar SSL Cloudflare: ' + error.message });
   }
 }
 
@@ -589,6 +706,7 @@ module.exports = {
   createSite,
   deleteSite,
   toggleSSL,
+  enableCloudflareSSL,
   getSiteConfig,
   saveSiteConfig
 };

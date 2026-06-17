@@ -69,7 +69,7 @@ curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin
 
 # Instalar Servidores de Cache
 echo -e "${YELLOW}Instalando Redis e Memcached...${NC}"
-apt install -y redis-server memcached php-memcached
+apt install -y redis-server memcached php-memcached php-redis
 
 # Instalar Certbot (SSL Let's Encrypt)
 echo -e "${YELLOW}Instalando Certbot para Nginx...${NC}"
@@ -135,6 +135,12 @@ chmod -R 775 /var/www
 mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
 chown -R root:bcp /etc/nginx/sites-available /etc/nginx/sites-enabled
 chmod -R 775 /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+# Diretório para certificados SSL personalizados (ex: Cloudflare Origin Certificate).
+# Acessível ao grupo bcp para escrita, fechado a outros para proteger as chaves privadas.
+mkdir -p /etc/ssl/bestcode
+chown -R root:bcp /etc/ssl/bestcode
+chmod -R 770 /etc/ssl/bestcode
 
 # Configura regras sudoers exclusivas para o utilizador bcp (segurança reforçada)
 cat <<EOF > /etc/sudoers.d/bestcode-cp
@@ -385,8 +391,18 @@ if [ -n "$PHP_SERVICE" ]; then
     systemctl restart $PHP_SERVICE
 fi
 
-# Aguarda o serviço iniciar e criar o banco/credenciais
-sleep 5
+# Aguarda o painel arrancar e semear o admin (poll em vez de sleep fixo).
+# Avança assim que as credenciais estiverem prontas; teto de segurança de 60s
+# para servidores lentos, evitando "credenciais inválidas" logo após instalar.
+FIRST_BOOT_FILE="/opt/bestcode-cp/first-boot.txt"
+echo -e "${YELLOW}Aguardando o painel iniciar e gerar as credenciais...${NC}"
+for i in $(seq 1 60); do
+  if [ -f "$FIRST_BOOT_FILE" ] && grep -q "PASSWORD:" "$FIRST_BOOT_FILE" 2>/dev/null; then
+    echo -e "${GREEN}Painel pronto (após ${i}s).${NC}"
+    break
+  fi
+  sleep 1
+done
 
 # Garante permissões restritas e seguras nos ficheiros criados
 chmod 600 /opt/bestcode-cp/backend/database.db 2>/dev/null || true
@@ -398,7 +414,6 @@ chown bcp:bcp /opt/bestcode-cp/first-boot.txt 2>/dev/null || true
 echo "$DAEMON_SECRET" > /opt/bestcode-cp/daemon-secret.txt
 chmod 600 /opt/bestcode-cp/daemon-secret.txt
 
-FIRST_BOOT_FILE="/opt/bestcode-cp/first-boot.txt"
 ROOT_PASSWORD="Falha ao carregar senha gerada automaticamente."
 
 if [ -f "$FIRST_BOOT_FILE" ]; then

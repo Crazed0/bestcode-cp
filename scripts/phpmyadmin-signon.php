@@ -12,7 +12,8 @@
  * $cfg['Servers'][$i]['SignonURL'] = '/phpmyadmin/signon.php';
  */
 
-// Define o caminho do banco SQLite do painel com suporte dinâmico a dev (WSL mount) e prod
+// Caminho do banco SQLite do painel (usado apenas como fallback se o Redis não tiver o token).
+// Suporta dev (WSL mount) e produção. Pode ficar vazio — só importa no fallback.
 $db_paths = [
     '/mnt/c/Users/Deyvi/Desktop/sites/BestCode/bestcode-cp/backend/database.db',
     '/opt/bestcode-cp/backend/database.db'
@@ -23,9 +24,6 @@ foreach ($db_paths as $path) {
         $db_path = $path;
         break;
     }
-}
-if (!$db_path) {
-    die("Erro de Integração: Banco de dados do painel não encontrado.");
 }
 define('DB_PATH', $db_path);
 
@@ -57,19 +55,12 @@ if (!$token) {
     exit;
 }
 
-// Conecta ao banco de dados do painel para verificar o token
+// Verifica o token: tenta primeiro o Redis (caminho principal) e usa o SQLite só como fallback
 try {
-    if (!file_exists(DB_PATH)) {
-        die("Erro de Integração: Banco de dados do painel não encontrado em " . DB_PATH);
-    }
-
-    $db = new PDO('sqlite:' . DB_PATH);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
     $session = null;
     $redis_success = false;
 
-    // Tenta obter os dados da sessão do Redis se a extensão estiver ativa
+    // Tenta obter os dados da sessão do Redis (onde o backend grava por omissão)
     if (class_exists('Redis')) {
         try {
             $redis = new Redis();
@@ -89,6 +80,16 @@ try {
     }
 
     if (!$redis_success) {
+        // Fallback: consulta a sessão no SQLite do painel.
+        // Só aqui o ficheiro é necessário; se faltar, dá erro claro a apontar para o Redis.
+        if (!DB_PATH || !file_exists(DB_PATH)) {
+            die("Erro de Integração: token não encontrado no Redis e o banco de dados do painel não está acessível. " .
+                "Confirme que a extensão 'php-redis' está instalada e que o serviço Redis está ativo.");
+        }
+
+        $db = new PDO('sqlite:' . DB_PATH);
+        $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
         // Consulta os dados da sessão no SQLite (fallback)
         $stmt = $db->prepare("SELECT db_user, db_pass, expires_at FROM sso_sessions WHERE token = :token");
         $stmt->execute([':token' => $token]);

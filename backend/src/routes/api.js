@@ -462,6 +462,7 @@ router.get('/sites', authenticateToken, siteController.getSites);
 router.post('/sites/create', authenticateToken, siteController.createSite);
 router.post('/sites/delete', authenticateToken, siteController.deleteSite);
 router.post('/sites/ssl', authenticateToken, siteController.toggleSSL);
+router.post('/sites/ssl-cloudflare', authenticateToken, siteController.enableCloudflareSSL);
 router.get('/sites/config', authenticateToken, siteController.getSiteConfig);
 router.post('/sites/config', authenticateToken, siteController.saveSiteConfig);
 
