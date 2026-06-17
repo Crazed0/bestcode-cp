@@ -162,9 +162,12 @@ npm install --prefer-offline --no-audit --no-fund --omit=dev
 echo -e "${YELLOW}[5/9] Instalando e configurando o phpMyAdmin...${NC}"
 PMA_VERSION="5.2.1"
 wget https://files.phpmyadmin.net/phpMyAdmin/${PMA_VERSION}/phpMyAdmin-${PMA_VERSION}-all-languages.zip -O /tmp/pma.zip
-unzip -q /tmp/pma.zip -d /usr/share/
+# Remove pastas residuais de tentativas anteriores para evitar conflitos de caminhos ou prompts
+rm -rf /usr/share/phpMyAdmin-${PMA_VERSION}-all-languages
+rm -rf /usr/share/phpmyadmin
+unzip -o -q /tmp/pma.zip -d /usr/share/
 mv /usr/share/phpMyAdmin-${PMA_VERSION}-all-languages /usr/share/phpmyadmin
-rm /tmp/pma.zip
+rm -f /tmp/pma.zip
 
 # Gera o caminho aleatório do phpMyAdmin
 PMA_SUFFIX=$(openssl rand -hex 4)
