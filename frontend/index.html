@@ -607,13 +607,14 @@
                 <tr>
                   <th>Nome do Banco</th>
                   <th>Utilizador MySQL</th>
+                  <th>Host</th>
                   <th>Data de Criação</th>
                   <th style="text-align: right;">Ações</th>
                 </tr>
               </thead>
               <tbody id="db-list-body">
                 <tr>
-                  <td colspan="4" style="text-align: center; color: var(--text-muted);">Nenhum banco de dados configurado.</td>
+                  <td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhum banco de dados configurado.</td>
                 </tr>
               </tbody>
             </table>
@@ -1210,6 +1211,10 @@
           <div class="form-group">
             <label class="form-label" for="db-pass">Palavra-passe do Utilizador</label>
             <input type="password" class="form-input" id="db-pass" placeholder="Definir palavra-passe" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="db-host">Host de Acesso</label>
+            <input type="text" class="form-input" id="db-host" value="localhost" placeholder="ex: localhost ou % ou IP remoto" required>
           </div>
         </div>
         <div class="modal-footer">

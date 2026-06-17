@@ -25,7 +25,7 @@ async function runMysqlQuery(sql) {
  */
 async function getDatabases(req, res) {
   try {
-    const list = db.prepare('SELECT id, db_name, db_user, created_at FROM databases ORDER BY created_at DESC').all();
+    const list = db.prepare('SELECT id, db_name, db_user, db_host, created_at FROM databases ORDER BY created_at DESC').all();
     res.json(list);
   } catch (error) {
     res.status(500).json({ error: 'Erro ao buscar bancos: ' + error.message });
@@ -36,7 +36,7 @@ async function getDatabases(req, res) {
  * Criar um novo banco de dados e usuário associado
  */
 async function createDatabase(req, res) {
-  const { dbName, dbUser, dbPass } = req.body;
+  const { dbName, dbUser, dbPass, dbHost } = req.body;
 
   if (!dbName || !dbUser || !dbPass) {
     return res.status(400).json({ error: 'Nome do banco, usuário e senha são obrigatórios.' });
@@ -45,9 +45,10 @@ async function createDatabase(req, res) {
   // Sanitização simples (apenas letras, números e underlines)
   const safeDbName = dbName.replace(/[^a-zA-Z0-9_]/g, '');
   const safeDbUser = dbUser.replace(/[^a-zA-Z0-9_]/g, '');
+  const safeDbHost = (dbHost || 'localhost').trim().replace(/[^a-zA-Z0-9_\.\-%]/g, '');
 
-  if (!safeDbName || !safeDbUser) {
-    return res.status(400).json({ error: 'Nome de banco ou usuário contém caracteres inválidos.' });
+  if (!safeDbName || !safeDbUser || !safeDbHost) {
+    return res.status(400).json({ error: 'Nome de banco, usuário ou host contém caracteres inválidos.' });
   }
 
   const reservedUsers = ['root', 'mysql', 'mariadb', 'admin', 'debian-sys-maint'];
@@ -64,15 +65,15 @@ async function createDatabase(req, res) {
     // 1. Criar o banco e o usuário no MySQL do sistema
     const sqlCommands = `
       CREATE DATABASE IF NOT EXISTS \`${safeDbName}\`;
-      CREATE USER IF NOT EXISTS '${safeDbUser}'@'localhost' IDENTIFIED BY '${dbPass}';
-      GRANT ALL PRIVILEGES ON \`${safeDbName}\`.* TO '${safeDbUser}'@'localhost';
+      CREATE USER IF NOT EXISTS '${safeDbUser}'@'${safeDbHost}' IDENTIFIED BY '${dbPass}';
+      GRANT ALL PRIVILEGES ON \`${safeDbName}\`.* TO '${safeDbUser}'@'${safeDbHost}';
       FLUSH PRIVILEGES;
     `;
     await runMysqlQuery(sqlCommands);
 
     // 2. Salvar no SQLite do painel
-    db.prepare('INSERT INTO databases (db_name, db_user, db_pass) VALUES (?, ?, ?)')
-      .run(safeDbName, safeDbUser, dbPass);
+    db.prepare('INSERT INTO databases (db_name, db_user, db_pass, db_host) VALUES (?, ?, ?, ?)')
+      .run(safeDbName, safeDbUser, dbPass, safeDbHost);
 
     res.json({ message: 'Banco de dados criado com sucesso!', dbName: safeDbName });
   } catch (error) {
@@ -92,7 +93,8 @@ async function deleteDatabase(req, res) {
       return res.status(404).json({ error: 'Banco de dados não encontrado.' });
     }
 
-    const { db_name, db_user } = dbRecord;
+    const { db_name, db_user, db_host } = dbRecord;
+    const dbHost = db_host || 'localhost';
 
     // 1. Deletar do MySQL do sistema
     const sqlCommands = [`DROP DATABASE IF EXISTS \`${db_name}\`;`];
@@ -100,7 +102,7 @@ async function deleteDatabase(req, res) {
     
     // Apenas remove o usuário MySQL associado se não for um usuário do sistema/root
     if (!reservedUsers.includes(db_user.toLowerCase())) {
-      sqlCommands.push(`DROP USER IF EXISTS '${db_user}'@'localhost';`);
+      sqlCommands.push(`DROP USER IF EXISTS '${db_user}'@'${dbHost}';`);
     }
     
     await runMysqlQuery(sqlCommands.join('\n'));
@@ -168,11 +170,12 @@ async function changeDatabasePassword(req, res) {
       return res.status(404).json({ error: 'Banco de dados não encontrado.' });
     }
 
-    const { db_user } = dbRecord;
+    const { db_user, db_host } = dbRecord;
+    const dbHost = db_host || 'localhost';
 
     // 1. Atualizar a senha no MySQL do sistema
     const sqlCommands = `
-      ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${newPass}';
+      ALTER USER '${db_user}'@'${dbHost}' IDENTIFIED BY '${newPass}';
       FLUSH PRIVILEGES;
     `;
     await runMysqlQuery(sqlCommands);

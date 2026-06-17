@@ -149,6 +149,11 @@ try {
   db.exec("ALTER TABLE game_servers ADD COLUMN node_id INTEGER DEFAULT NULL;");
 } catch (e) {}
 
+// Adiciona coluna db_host na tabela databases de forma segura
+try {
+  db.exec("ALTER TABLE databases ADD COLUMN db_host TEXT DEFAULT 'localhost';");
+} catch (e) {}
+
 // Auto-inicialização do Administrador Root
 try {
   const userCount = db.prepare('SELECT count(*) as total FROM users').get().total;

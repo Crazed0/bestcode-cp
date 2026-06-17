@@ -811,7 +811,7 @@ async function loadDatabases() {
   try {
     const databases = await apiGet('/databases');
     if (!databases || databases.length === 0) {
-      container.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">Nenhuma base de dados configurada.</td></tr>`;
+      container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhuma base de dados configurada.</td></tr>`;
       return;
     }
 
@@ -823,6 +823,7 @@ async function loadDatabases() {
       tr.innerHTML = `
         <td><strong>${db.db_name}</strong></td>
         <td>${db.db_user}</td>
+        <td><code>${db.db_host || 'localhost'}</code></td>
         <td>${date}</td>
         <td style="text-align: right;">
           <button class="btn-secondary" style="display:inline-flex; padding:6px 12px; font-size:12px; margin-right:6px;" onclick="openChangeDbPassModal(${db.id})">
@@ -1198,13 +1199,15 @@ function setupForms() {
     const dbName = document.getElementById('db-name').value;
     const dbUser = document.getElementById('db-user').value;
     const dbPass = document.getElementById('db-pass').value;
+    const dbHost = document.getElementById('db-host').value;
 
     try {
-      const data = await apiPost('/databases/create', { dbName, dbUser, dbPass });
+      const data = await apiPost('/databases/create', { dbName, dbUser, dbPass, dbHost });
       if (data) {
         showToast(data.message, 'success');
         closeModal('modal-create-db');
         document.getElementById('create-db-form').reset();
+        document.getElementById('db-host').value = 'localhost'; // reseta para o default
         loadDatabases();
       }
     } catch (err) {}
