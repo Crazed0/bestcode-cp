@@ -27,7 +27,7 @@ const dockerService = require('../services/dockerService');
 
 // Configuração do Sentinela Anti-Crash
 let autoQuarantineEnabled = true;
-const sentinelWhitelist = ['node', 'systemd', 'init', 'dockerd', 'containerd', 'mariadbd', 'mysql', 'nginx', 'sshd', 'bash', 'sh', 'powershell.exe', 'wsl', 'rsyslogd', 'cron', 'systemd-udevd', 'dbus-daemon'];
+const sentinelWhitelist = ['node', 'systemd', 'init', 'dockerd', 'containerd', 'mariadbd', 'mysql', 'nginx', 'sshd', 'bash', 'sh', 'powershell.exe', 'wsl', 'rsyslogd', 'cron', 'systemd-udevd', 'dbus-daemon', 'ps', 'git', 'npm', 'unzip', 'wget', 'curl', 'postfix', 'dovecot', 'pure-ftpd', 'pdns_server', 'pdns', 'rspamd', 'opendkim', 'fail2ban-client', 'fail2ban-server', 'ufw', 'certbot'];
 
 // Monitor de Anti-Crash em background (corre a cada 10 segundos)
 setInterval(() => {
