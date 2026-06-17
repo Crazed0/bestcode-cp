@@ -13,6 +13,17 @@ const { JWT_SECRET } = require('./config/auth');
 const { getLatestMetrics, getMetricsHistory } = require('./controllers/monitorController');
 const dockerService = require('./services/dockerService');
 
+// Limpar o ficheiro de logs do terminal de sistema no arranque do servidor para começar limpo
+try {
+  const terminalLogPath = path.resolve(__dirname, '../temp/terminal.log');
+  if (fs.existsSync(terminalLogPath)) {
+    fs.truncateSync(terminalLogPath, 0);
+    console.log('[Terminal Log] Ficheiro terminal.log limpo no arranque do servidor.');
+  }
+} catch (err) {
+  console.error('[Terminal Log] Erro ao limpar terminal.log no arranque:', err);
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -45,6 +56,12 @@ app.use('/phpmyadmin', (req, res) => {
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Middleware de log de requisições simples
+app.use((req, res, next) => {
+  console.log(`[HTTP] ${req.method} ${req.path}`);
+  next();
+});
 
 // Rotas da API
 app.use('/api', apiRoutes);
@@ -130,6 +147,9 @@ wss.on('connection', (ws, request, user) => {
       activeLogStream = null;
     }
     if (activeShell) {
+      try {
+        activeShell.removeAllListeners('close');
+      } catch (e) {}
       activeShell.kill();
       activeShell = null;
     }
@@ -194,18 +214,7 @@ wss.on('connection', (ws, request, user) => {
           fs.writeFileSync(logFilePath, initialMessage, 'utf8');
         }
 
-        // Envia o histórico existente ao utilizador
-        try {
-          const history = fs.readFileSync(logFilePath, 'utf8');
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'root_console_log',
-              data: history
-            }));
-          }
-        } catch (err) {
-          console.error('Erro ao ler histórico do terminal:', err);
-        }
+
 
         const isWin = process.platform === 'win32';
         const shell = isWin ? 'powershell.exe' : 'bash';
@@ -278,19 +287,29 @@ wss.on('connection', (ws, request, user) => {
       } else if (data.type === 'root_console_command') {
         const { command } = data;
         if (activeShell && command) {
-          const timestamp = new Date().toLocaleString('pt-PT');
-          const logLine = `[${timestamp}] ${user.username}: ${command}\n`;
-          try {
-            fs.appendFileSync(path.resolve(__dirname, '../temp/terminal.log'), logLine, 'utf8');
-          } catch (e) {
-            console.error('Erro ao escrever comando no terminal.log:', e);
-          }
-          // Envia o comando instantaneamente de volta ao ecrã para resposta visual
-          if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({
-              type: 'root_console_log',
-              data: logLine
-            }));
+          const isClear = command.trim().toLowerCase() === 'clear' || command.trim().toLowerCase() === 'cls';
+          
+          if (isClear) {
+            try {
+              fs.writeFileSync(path.resolve(__dirname, '../temp/terminal.log'), '', 'utf8');
+            } catch (e) {
+              console.error('Erro ao limpar terminal.log:', e);
+            }
+          } else {
+            const timestamp = new Date().toLocaleString('pt-PT');
+            const logLine = `[${timestamp}] ${user.username}: ${command}\n`;
+            try {
+              fs.appendFileSync(path.resolve(__dirname, '../temp/terminal.log'), logLine, 'utf8');
+            } catch (e) {
+              console.error('Erro ao escrever comando no terminal.log:', e);
+            }
+            // Envia o comando instantaneamente de volta ao ecrã para resposta visual
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({
+                type: 'root_console_log',
+                data: logLine
+              }));
+            }
           }
           activeShell.stdin.write(command + '\n');
         }

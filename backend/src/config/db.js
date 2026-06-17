@@ -110,6 +110,40 @@ try {
   db.exec("ALTER TABLE users ADD COLUMN avatar_url TEXT DEFAULT NULL;");
 } catch (e) {}
 
+// Cria tabela de nós (system_nodes)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS system_nodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    ip_address TEXT NOT NULL,
+    api_port INTEGER DEFAULT 8080,
+    daemon_token_secret TEXT NOT NULL,
+    is_active BOOLEAN DEFAULT 1,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+`);
+
+// Cria tabela de histórico de logins (login_history)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS login_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    ip_address TEXT NOT NULL,
+    location TEXT DEFAULT 'Desconhecido',
+    user_agent TEXT,
+    is_unknown_location INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_login_history_user_id ON login_history(user_id);
+`);
+
+// Adiciona coluna node_id na tabela game_servers de forma segura
+try {
+  db.exec("ALTER TABLE game_servers ADD COLUMN node_id INTEGER DEFAULT NULL;");
+} catch (e) {}
+
 // Auto-inicialização do Administrador Root
 try {
   const userCount = db.prepare('SELECT count(*) as total FROM users').get().total;

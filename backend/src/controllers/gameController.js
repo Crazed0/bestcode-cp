@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const dockerService = require('../services/dockerService');
+const jwt = require('jsonwebtoken');
 
 // Portas base por tipo de jogo
 const GAME_BASE_PORTS = {
@@ -30,7 +31,12 @@ function getNextFreePort(gameType) {
  */
 async function getGames(req, res) {
   try {
-    const servers = db.prepare('SELECT * FROM game_servers ORDER BY id DESC').all();
+    const servers = db.prepare(`
+      SELECT gs.*, n.name AS node_name
+      FROM game_servers gs
+      LEFT JOIN system_nodes n ON gs.node_id = n.id
+      ORDER BY gs.id DESC
+    `).all();
     
     // Obtém estatísticas do Docker em paralelo para todos os servidores rodando
     const serversWithStats = await Promise.all(servers.map(async (server) => {
@@ -59,7 +65,7 @@ async function getGames(req, res) {
  * Criar um novo servidor de jogo (Docker Container + Registro no DB)
  */
 async function createGame(req, res) {
-  const { name, game_type, ram_limit_mb, cpu_limit } = req.body;
+  const { name, game_type, ram_limit_mb, cpu_limit, node_id } = req.body;
 
   if (!name || !game_type || !ram_limit_mb) {
     return res.status(400).json({ error: 'Nome, tipo de jogo e limite de RAM são obrigatórios.' });
@@ -78,9 +84,9 @@ async function createGame(req, res) {
 
     // 2. Insere no DB em estado "installing"
     const insertResult = db.prepare(`
-      INSERT INTO game_servers (name, game_type, host_port, ram_limit_mb, cpu_limit, status)
-      VALUES (?, ?, ?, ?, ?, 'installing')
-    `).run(name, game_type, hostPort, ram, cpu);
+      INSERT INTO game_servers (name, game_type, host_port, ram_limit_mb, cpu_limit, status, node_id)
+      VALUES (?, ?, ?, ?, ?, 'installing', ?)
+    `).run(name, game_type, hostPort, ram, cpu, node_id || null);
 
     const serverId = insertResult.lastInsertRowid;
 
@@ -190,9 +196,44 @@ async function deleteGame(req, res) {
   }
 }
 
+/**
+ * Obter configuração de conexão do console (Redirecionamento para o nó remoto se necessário)
+ */
+async function getConsoleConfig(req, res) {
+  const { id } = req.params;
+  try {
+    const server = db.prepare('SELECT * FROM game_servers WHERE id = ?').get(id);
+    if (!server) {
+      return res.status(404).json({ error: 'Servidor de jogo não encontrado.' });
+    }
+
+    if (!server.node_id) {
+      return res.json({ is_remote: false });
+    }
+
+    const node = db.prepare('SELECT * FROM system_nodes WHERE id = ?').get(server.node_id);
+    if (!node) {
+      return res.status(404).json({ error: 'Nó de servidor associado não encontrado.' });
+    }
+
+    // Gera um token JWT assinado com o segredo do nó
+    const token = jwt.sign({ panel: true, gameServerId: id }, node.daemon_token_secret, { expiresIn: '15m' });
+
+    res.json({
+      is_remote: true,
+      ip_address: node.ip_address,
+      api_port: node.api_port,
+      token: token
+    });
+  } catch (error) {
+    res.status(500).json({ error: 'Erro ao obter configuração de conexão do console: ' + error.message });
+  }
+}
+
 module.exports = {
   getGames,
   createGame,
   controlGame,
-  deleteGame
+  deleteGame,
+  getConsoleConfig
 };

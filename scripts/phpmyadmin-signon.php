@@ -66,27 +66,51 @@ try {
     $db = new PDO('sqlite:' . DB_PATH);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // Consulta os dados da sessão
-    $stmt = $db->prepare("SELECT db_user, db_pass, expires_at FROM sso_sessions WHERE token = :token");
-    $stmt->execute([':token' => $token]);
-    $session = $stmt->fetch(PDO::FETCH_ASSOC);
+    $session = null;
+    $redis_success = false;
 
-    if (!$session) {
-        die("Sessão inválida: O token fornecido não foi encontrado.");
+    // Tenta obter os dados da sessão do Redis se a extensão estiver ativa
+    if (class_exists('Redis')) {
+        try {
+            $redis = new Redis();
+            // Conecta com timeout de 1.0s
+            if (@$redis->connect('127.0.0.1', 6379, 1.0)) {
+                $redisKey = "bcp:sso:" . $token;
+                $cachedData = $redis->get($redisKey);
+                if ($cachedData) {
+                    $session = json_decode($cachedData, true);
+                    $redis->del($redisKey); // Consome o token (OTC)
+                    $redis_success = true;
+                }
+            }
+        } catch (Exception $e) {
+            // Ignora erro e faz fallback para SQLite
+        }
     }
 
-    // Verifica se o token expirou (limite de 60 segundos)
-    $currentTimeMs = round(microtime(true) * 1000);
-    if ($currentTimeMs > $session['expires_at']) {
-        // Exclui o token expirado
+    if (!$redis_success) {
+        // Consulta os dados da sessão no SQLite (fallback)
+        $stmt = $db->prepare("SELECT db_user, db_pass, expires_at FROM sso_sessions WHERE token = :token");
+        $stmt->execute([':token' => $token]);
+        $session = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$session) {
+            die("Sessão inválida: O token fornecido não foi encontrado.");
+        }
+
+        // Verifica se o token expirou (limite de 60 segundos)
+        $currentTimeMs = round(microtime(true) * 1000);
+        if ($currentTimeMs > $session['expires_at']) {
+            // Exclui o token expirado
+            $del = $db->prepare("DELETE FROM sso_sessions WHERE token = :token");
+            $del->execute([':token' => $token]);
+            die("Sessão expirada: O token de acesso expirou. Volte ao painel e tente novamente.");
+        }
+
+        // Apaga o token do banco para que não seja reutilizado (Token de Uso Único - OTC)
         $del = $db->prepare("DELETE FROM sso_sessions WHERE token = :token");
         $del->execute([':token' => $token]);
-        die("Sessão expirada: O token de acesso expirou. Volte ao painel e tente novamente.");
     }
-
-    // Apaga o token do banco para que não seja reutilizado (Token de Uso Único - OTC)
-    $del = $db->prepare("DELETE FROM sso_sessions WHERE token = :token");
-    $del->execute([':token' => $token]);
 
     // Grava as credenciais na sessão para que o phpMyAdmin as recolha
     $_SESSION['PMA_single_signon_user'] = $session['db_user'];

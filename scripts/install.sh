@@ -60,7 +60,7 @@ for v in 8.1 8.2 8.3; do
   apt install -y \
     php$v-fpm php$v-cli php$v-common php$v-mysql php$v-curl \
     php$v-gd php$v-mbstring php$v-xml php$v-zip php$v-bcmath \
-    php$v-intl php$v-soap php$v-imagick php$v-opcache php$v-readline
+    php$v-intl php$v-soap php$v-imagick php$v-opcache php$v-readline php$v-redis
 done
 
 # Instalar Composer
@@ -101,18 +101,37 @@ apt install -y borgbackup restic
 
 # 3. Configurando Diretórios do BestCode CP
 echo -e "${YELLOW}[3/9] Configurando arquivos do BestCode CP...${NC}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PARENT_DIR="$(dirname "$SCRIPT_DIR")"
+
 mkdir -p /opt/bestcode-cp
-cp -r ../backend /opt/bestcode-cp/
-cp -r ../frontend /opt/bestcode-cp/
-cp -r ../scripts /opt/bestcode-cp/
+
+if [ -d "$PARENT_DIR/.git" ]; then
+  echo -e "Copiando repositório Git existente para /opt/bestcode-cp..."
+  # Copia todo o conteúdo incluindo o diretório oculto .git
+  cp -r "$PARENT_DIR/." /opt/bestcode-cp/
+else
+  echo -e "Clonando repositório Git em /opt/bestcode-cp..."
+  git clone https://github.com/Crazed0/bestcode-cp.git /opt/bestcode-cp
+fi
+
+# Torna o script de atualização executável
+chmod +x /opt/bestcode-cp/scripts/update.sh
+
+# Garante que o Git aceita o diretório como confiável para atualizações do root
+git config --global --add safe.directory /opt/bestcode-cp
 
 # Ajustando permissões
 chown -R root:root /opt/bestcode-cp
 chmod -R 755 /opt/bestcode-cp
 
-# 4. Instalando dependências do Backend (Node.js)
-echo -e "${YELLOW}[4/9] Instalando dependências da API do Painel...${NC}"
+# 4. Instalando dependências do Backend e do Daemon
+echo -e "${YELLOW}[4/9] Instalando dependências da API do Painel e do Daemon...${NC}"
 cd /opt/bestcode-cp/backend
+npm install --omit=dev
+
+echo -e "Instalando dependências do Wings Daemon..."
+cd /opt/bestcode-cp/daemon
 npm install --omit=dev
 
 # 5. Instalação e Configuração do phpMyAdmin com Autologin (SSO)
@@ -210,8 +229,8 @@ EOF
 ln -sf /etc/nginx/sites-available/bestcode-cp /etc/nginx/sites-enabled/bestcode-cp
 rm -f /etc/nginx/sites-enabled/default
 
-# 7. Configuração do Serviço Systemd do Painel BCP
-echo -e "${YELLOW}[7/9] Configurando serviço systemd do Painel...${NC}"
+# 7. Configuração dos Serviços Systemd do Painel e Daemon
+echo -e "${YELLOW}[7/9] Configurando serviços systemd do Painel e Daemon (Wings)...${NC}"
 cat <<EOF > /etc/systemd/system/bestcode-cp.service
 [Unit]
 Description=BestCode Control Panel Backend Agent
@@ -229,9 +248,29 @@ Environment=NODE_ENV=production PORT=3000 JWT_SECRET=$(openssl rand -base64 32)
 WantedBy=multi-user.target
 EOF
 
+cat <<EOF > /etc/systemd/system/bestcode-cp-daemon.service
+[Unit]
+Description=BestCode Control Panel Daemon Agent (Wings)
+After=network.target docker.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/bestcode-cp/daemon
+ExecStart=/usr/bin/node src/index.js
+Restart=on-failure
+Environment=NODE_ENV=production DAEMON_PORT=8080 DAEMON_SECRET=bcp-daemon-node-secret-key-2026
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
 systemctl daemon-reload
 systemctl enable bestcode-cp
 systemctl start bestcode-cp
+
+systemctl enable bestcode-cp-daemon
+systemctl start bestcode-cp-daemon
 
 # 8. Configuração de Postfix e Dovecot com SQLite Virtual Maps
 echo -e "${YELLOW}[8/9] Configurando Integração de E-mail com SQLite...${NC}"
@@ -295,6 +334,7 @@ systemctl restart nginx
 systemctl restart mariadb
 systemctl restart postfix
 systemctl restart dovecot
+systemctl restart bestcode-cp-daemon || true
 PHP_SERVICE=$(basename $(ls /lib/systemd/system/php*-fpm.service | head -n 1) .service 2>/dev/null || echo "")
 if [ -n "$PHP_SERVICE" ]; then
     systemctl restart $PHP_SERVICE
@@ -309,11 +349,19 @@ if [ -f "$FIRST_BOOT_FILE" ]; then
   ROOT_PASSWORD=$(grep "PASSWORD:" "$FIRST_BOOT_FILE" | cut -d' ' -f2)
 fi
 
+# Obtém o IP público ou local para exibição
+LOCAL_IP=$(hostname -I | awk '{print $1}')
+PUBLIC_IP=$(curl -s --max-time 3 https://api.ipify.org || curl -s --max-time 3 https://ifconfig.me || echo "")
+DISPLAY_IP="${PUBLIC_IP:-$LOCAL_IP}"
+if [ -z "$DISPLAY_IP" ]; then
+  DISPLAY_IP="IP_DO_SEU_SERVIDOR"
+fi
+
 echo -e "${GREEN}==================================================================${NC}"
 echo -e "${GREEN}🎉 BESTCODE CONTROL PANEL INSTALADO COM SUCESSO!${NC}"
 echo -e "${GREEN}==================================================================${NC}"
 echo -e "Você já pode aceder ao seu painel via navegador através do IP do servidor:"
-echo -e "${BLUE}http://IP_DO_SEU_SERVIDOR/${NC}"
+echo -e "${BLUE}http://${DISPLAY_IP}/${NC}"
 echo -e ""
 echo -e "🔑 CREDENCIAIS DO ADMINISTRADOR INICIAL:"
 echo -e "👤 Utilizador: ${GREEN}root${NC}"

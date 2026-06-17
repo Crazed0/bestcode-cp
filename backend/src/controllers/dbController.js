@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const db = require('../config/db');
 const { execCommand, isLinux } = require('../services/systemService');
+const redisClient = require('../config/redis');
 
 /**
  * Helper para executar comandos SQL no MySQL/MariaDB do servidor
@@ -129,9 +130,21 @@ async function generateSsoToken(req, res) {
     const token = crypto.randomBytes(32).toString('hex');
     const expiresAt = Date.now() + 60 * 1000; // Expira em 60 segundos
 
-    // Salvar token temporário no SQLite
-    db.prepare('INSERT INTO sso_sessions (token, db_user, db_pass, expires_at) VALUES (?, ?, ?, ?)')
-      .run(token, dbRecord.db_user, dbRecord.db_pass, expiresAt);
+    if (redisClient.isReady) {
+      // Salva no Redis com TTL de 60 segundos
+      const sessionData = JSON.stringify({
+        db_user: dbRecord.db_user,
+        db_pass: dbRecord.db_pass,
+        expires_at: expiresAt
+      });
+      await redisClient.setEx(`bcp:sso:${token}`, 60, sessionData);
+      console.log(`[REDIS] Token SSO gerado em memória: ${token}`);
+    } else {
+      // Fallback para SQLite
+      db.prepare('INSERT INTO sso_sessions (token, db_user, db_pass, expires_at) VALUES (?, ?, ?, ?)')
+        .run(token, dbRecord.db_user, dbRecord.db_pass, expiresAt);
+      console.log(`[SQLITE] Token SSO gravado no banco de dados (fallback): ${token}`);
+    }
 
     res.json({ token });
   } catch (error) {

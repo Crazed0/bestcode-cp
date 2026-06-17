@@ -2,6 +2,38 @@ const { exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const { isLinux, execCommand } = require('./systemService');
+const db = require('../config/db');
+const jwt = require('jsonwebtoken');
+
+/**
+ * Envia uma requisição HTTP autenticada para um nó de servidor remoto (BCP Wings Daemon)
+ */
+async function callNodeApi(nodeId, endpoint, method = 'GET', body = null) {
+  const node = db.prepare('SELECT * FROM system_nodes WHERE id = ?').get(nodeId);
+  if (!node || node.is_active === 0) {
+    throw new Error(`Nó de servidor #${nodeId} está inativo ou indisponível.`);
+  }
+
+  // Gera um token JWT assinado com o segredo do nó
+  const token = jwt.sign({ panel: true }, node.daemon_token_secret, { expiresIn: '1m' });
+
+  const url = `http://${node.ip_address}:${node.api_port}${endpoint}`;
+  const response = await fetch(url, {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
+    body: body ? JSON.stringify(body) : null
+  });
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(errData.error || `Erro na API do Nó (Status ${response.status})`);
+  }
+
+  return response.json();
+}
 
 // Pasta raiz para armazenar os arquivos dos servidores de jogos
 const GAMES_ROOT = isLinux 
@@ -69,6 +101,22 @@ function runDockerCmd(cmd) {
  * Cria e inicia o container Docker para um jogo
  */
 async function createContainer(id, gameType, hostPort, ramLimitMb, cpuLimit) {
+  // Verifica se o servidor de jogo está registrado num nó remoto
+  const serverObj = db.prepare('SELECT node_id FROM game_servers WHERE id = ?').get(id);
+  const nodeId = serverObj ? serverObj.node_id : null;
+
+  if (nodeId) {
+    try {
+      const response = await callNodeApi(nodeId, '/api/servers', 'POST', {
+        id, gameType, hostPort, ramLimitMb, cpuLimit
+      });
+      return { containerId: response.containerId, error: null };
+    } catch (err) {
+      console.error(`[DAEMON CREATE ERROR] Falha ao criar container no nó #${nodeId}:`, err.message);
+      return { containerId: null, error: err.message };
+    }
+  }
+
   const serverDir = initGameServerDir(id);
   
   // Cria arquivo de propriedades inicial para o Minecraft ou outros de forma mock
@@ -143,6 +191,14 @@ async function createContainer(id, gameType, hostPort, ramLimitMb, cpuLimit) {
  * Controla o estado de um container (start, stop, restart)
  */
 async function controlContainer(id, action, gameType) {
+  const serverObj = db.prepare('SELECT node_id FROM game_servers WHERE id = ?').get(id);
+  const nodeId = serverObj ? serverObj.node_id : null;
+
+  if (nodeId) {
+    await callNodeApi(nodeId, `/api/servers/${id}/power`, 'POST', { action });
+    return true;
+  }
+
   const containerName = `bcp-game-${id}`;
   let cmd = `docker ${action} ${containerName}`;
   const result = await runDockerCmd(cmd);
@@ -166,6 +222,14 @@ async function controlContainer(id, action, gameType) {
  * Remove o container Docker
  */
 async function removeContainer(id) {
+  const serverObj = db.prepare('SELECT node_id FROM game_servers WHERE id = ?').get(id);
+  const nodeId = serverObj ? serverObj.node_id : null;
+
+  if (nodeId) {
+    await callNodeApi(nodeId, `/api/servers/${id}`, 'DELETE');
+    return true;
+  }
+
   const containerName = `bcp-game-${id}`;
   
   // Para o container e remove
@@ -186,6 +250,18 @@ async function removeContainer(id) {
  * Retorna as estatísticas do container (CPU, RAM em tempo real)
  */
 async function getContainerStats(id) {
+  const serverObj = db.prepare('SELECT node_id FROM game_servers WHERE id = ?').get(id);
+  const nodeId = serverObj ? serverObj.node_id : null;
+
+  if (nodeId) {
+    return {
+      cpu: '0%',
+      ram: '0 MB',
+      rawCpu: 0,
+      rawRam: 0
+    };
+  }
+
   if (!isLinux) {
     // Retorna uso mockado aleatório se o servidor estiver rodando
     return {

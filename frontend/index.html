@@ -9,6 +9,29 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- RequireJS para carregar o Monaco Editor do VS Code -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js"></script>
+  <!-- Roteador Rápido Inline para evitar Flicker -->
+  <script>
+    (function() {
+      let path = window.location.pathname.substring(1) || 'dashboard';
+      if (path.endsWith('/')) path = path.slice(0, -1);
+      if (path === 'index.html' || path === '') path = 'dashboard';
+      
+      const validTabs = ['dashboard', 'console', 'processes', 'sites', 'game-servers', 'nodes', 'databases', 'logs', 'security', 'crons', 'emails', 'users', 'profile'];
+      if (!validTabs.includes(path)) path = 'dashboard';
+      
+      // Força a exibição imediata do painel correto
+      const style = document.createElement('style');
+      style.id = 'early-active-tab-style';
+      style.innerHTML = `#tab-${path} { display: flex !important; }`;
+      document.head.appendChild(style);
+      
+      // Força o realce do menu correto
+      const styleSidebar = document.createElement('style');
+      styleSidebar.id = 'early-active-sidebar-style';
+      styleSidebar.innerHTML = `.nav-item[data-tab="${path}"] { background: var(--bg-panel-hover); color: var(--color-primary); border-left: 3px solid var(--color-primary); }`;
+      document.head.appendChild(styleSidebar);
+    })();
+  </script>
 </head>
 <body>
 
@@ -21,7 +44,7 @@
       </div>
 
       <nav class="nav-menu">
-        <li class="nav-item active" data-tab="dashboard">
+        <li class="nav-item" data-tab="dashboard">
           <a href="/dashboard">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
             Dashboard
@@ -30,7 +53,13 @@
         <li class="nav-item" data-tab="console">
           <a href="/console">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
-            Consola Terminal
+            Terminal
+          </a>
+        </li>
+        <li class="nav-item" data-tab="processes">
+          <a href="/processes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+            Processes
           </a>
         </li>
         <li class="nav-item" data-tab="sites">
@@ -42,43 +71,49 @@
         <li class="nav-item" data-tab="game-servers">
           <a href="/game-servers">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2" ry="2"></rect><path d="M6 12h4M10 10v4M15 11h.01M18 13h.01"></path></svg>
-            Servidores
+            Servers
+          </a>
+        </li>
+        <li class="nav-item" data-tab="nodes">
+          <a href="/nodes">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+            Nodes
           </a>
         </li>
         <li class="nav-item" data-tab="databases">
           <a href="/databases">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"></path></svg>
-            Bases de Dados
+            Databases
           </a>
         </li>
         <li class="nav-item" data-tab="logs">
           <a href="/logs">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path><polyline points="13 2 13 9 20 9"></polyline></svg>
-            Registos (Logs)
+            Logs
           </a>
         </li>
         <li class="nav-item" data-tab="security">
           <a href="/security">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            Segurança
+            Security
           </a>
         </li>
         <li class="nav-item" data-tab="crons">
           <a href="/crons">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12,6 12,12 14,14"></polyline></svg>
-            Tarefas Agendadas
+            Cronjobs
           </a>
         </li>
         <li class="nav-item" data-tab="emails">
           <a href="/emails">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
-            Contas de E-mail
+            Emails
           </a>
         </li>
         <li class="nav-item" data-tab="users" id="nav-item-users" style="display: none;">
           <a href="/users">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-            Utilizadores
+            Users
           </a>
         </li>
       </nav>
@@ -115,7 +150,7 @@
       </header>
 
       <!-- ABA: DASHBOARD -->
-      <section class="tab-pane active" id="tab-dashboard" style="flex-direction: column; gap: 15px; padding: 20px 24px; overflow-y: hidden; height: calc(100vh - 70px);">
+      <section class="tab-pane" id="tab-dashboard" style="flex-direction: column; gap: 15px; padding: 20px 24px; overflow-y: hidden; height: calc(100vh - 70px);">
         <!-- Grid de Estatísticas rápidas -->
         <div class="monitor-grid" style="grid-template-columns: repeat(4, 1fr); gap: 12px; min-height: 80px;">
           <!-- CPU -->
@@ -151,7 +186,7 @@
           <!-- DISCO -->
           <div class="glass-card stat-card" style="padding: 10px 16px;">
             <div class="stat-details">
-              <span class="stat-label" style="font-size: 10px; letter-spacing: 0.02em;">Disco (SSD)</span>
+              <span class="stat-label" style="font-size: 10px; letter-spacing: 0.02em;">Disco SSD</span>
               <span class="stat-value" id="stat-disk-val" style="font-size: 20px;">0%</span>
               <span class="stat-subtext" id="stat-disk-sub" style="font-size: 9px;">0 GB / 0 GB</span>
             </div>
@@ -183,7 +218,7 @@
           <div style="display: flex; flex-direction: column; gap: 15px; overflow: hidden;">
             <!-- Gráfico de Carga -->
             <div class="glass-card" style="padding: 16px; flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;">
-              <h3 style="font-size: 13px; margin-bottom: 8px;">Histórico de Carga (Tempo Real)</h3>
+              <h3 style="font-size: 13px; margin-bottom: 8px;">Histórico de Carga</h3>
               <div class="chart-container" style="flex-grow: 1; min-height: 0; position: relative;">
                 <canvas id="performanceChart" style="width: 100%; height: 100%;"></canvas>
               </div>
@@ -275,11 +310,18 @@
                     <button class="btn-copy" style="padding: 1px 4px; font-size: 9px; flex-shrink: 0;" onclick="copyToClipboard(document.getElementById('sys-spec-kernel').innerText)" title="Copiar Kernel">⎘</button>
                   </div>
                 </div>
-                <div class="system-detail-item" style="padding-bottom: 6px; border-bottom: none; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                <div class="system-detail-item" style="padding-bottom: 6px; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
                   <span style="font-size: 11px; white-space: nowrap; flex-shrink: 0;">Endereço IP</span>
                   <div style="display: flex; align-items: center; gap: 4px; min-width: 0; justify-content: flex-end; flex-grow: 1;">
                     <strong id="sys-ip" style="font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; min-width: 0;">Carregando...</strong>
                     <button class="btn-copy" style="padding: 1px 4px; font-size: 9px; flex-shrink: 0;" onclick="copyToClipboard(document.getElementById('sys-ip').innerText)" title="Copiar IP">⎘</button>
+                  </div>
+                </div>
+                <div class="system-detail-item" style="padding-bottom: 6px; border-bottom: none; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+                  <span style="font-size: 11px; white-space: nowrap; flex-shrink: 0;">Versão Painel</span>
+                  <div style="display: flex; align-items: center; gap: 8px; min-width: 0; justify-content: flex-end; flex-grow: 1;">
+                    <strong id="sys-panel-version" style="font-size: 11px; color: var(--color-primary);">-</strong>
+                    <button class="btn-primary" id="btn-update-panel" style="padding: 2px 8px; font-size: 10px; height: 20px; line-height: 1; border-radius: 4px; display: none;" onclick="updatePanel()">Atualizar</button>
                   </div>
                 </div>
               </div>
@@ -354,12 +396,97 @@
         </div>
       </section>
 
+      <!-- ABA: NÓS DE SERVIDOR (WINGS) -->
+      <section class="tab-pane" id="tab-nodes">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <h2>Nós de Servidor</h2>
+            <span class="section-description">Gerencie as suas máquinas de host remotas para hospedar containers Docker distribuídos.</span>
+          </div>
+          <button class="btn-primary" onclick="openModal('modal-add-node')">
+            + Adicionar Nó
+          </button>
+        </div>
+
+        <div class="glass-card">
+          <div class="custom-table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Nome do Nó</th>
+                  <th>Endereço IP / Host</th>
+                  <th>Porta API</th>
+                  <th>Segredo JWT</th>
+                  <th>Criado em</th>
+                  <th style="text-align: right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="nodes-list-body">
+                <tr>
+                  <td colspan="6" style="text-align: center; color: var(--text-muted);">Carregando nós cadastrados...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+      <!-- ABA: GESTOR DE TAREFAS / PROCESSOS -->
+      <section class="tab-pane" id="tab-processes">
+        <div class="section-header">
+          <div class="section-title-wrapper">
+            <h2>Processos do Sistema</h2>
+            <span class="section-description">Monitore os processos ativos no servidor host em tempo real e encerre tarefas problemáticas.</span>
+          </div>
+        </div>
+
+        <!-- Sentinela Anti-Crash Status Card -->
+        <div class="glass-card" style="margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; padding: 15px 20px; border: 1px solid rgba(16, 185, 129, 0.2); background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(0,0,0,0.4));" id="sentinel-status-card">
+          <div style="display: flex; align-items: center; gap: 15px;">
+            <div style="width: 12px; height: 12px; border-radius: 50%; background-color: #10b981; box-shadow: 0 0 10px #10b981;" id="sentinel-status-dot"></div>
+            <div>
+              <h4 style="margin: 0; font-size: 14px; color: #ffffff; font-weight: 600;">Sentinela Anti-Crash</h4>
+              <p style="margin: 3px 0 0 0; font-size: 12px; color: var(--text-muted);">
+                Monitorização automática ativa. Processos não essenciais que passem os 95% de CPU entram em quarentena para evitar o crash do servidor.
+              </p>
+            </div>
+          </div>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span style="font-size: 12px; color: var(--text-muted);" id="sentinel-status-text">Proteção: Ativa</span>
+            <button id="btn-toggle-sentinel" class="btn-danger-outline" style="padding: 6px 14px; font-size: 12px; border-radius: 4px;" onclick="toggleSentinel()">
+              Desativar
+            </button>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="custom-table-container">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>PID</th>
+                  <th>Processo / Comando</th>
+                  <th>Utilizador</th>
+                  <th>CPU (%)</th>
+                  <th>RAM (%)</th>
+                  <th style="text-align: right;">Ações</th>
+                </tr>
+              </thead>
+              <tbody id="processes-list-body">
+                <tr>
+                  <td colspan="6" style="text-align: center; color: var(--text-muted);">A carregar processos ativos...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- ABA: CONSOLE DO SISTEMA (ROOT) -->
       <section class="tab-pane" id="tab-console" style="overflow-y: hidden; height: calc(100vh - 70px);">
         <div class="section-header" style="margin-bottom: 15px;">
           <div class="section-title-wrapper">
-            <h2>Console do Sistema (Root)</h2>
-            <span class="section-description">Acompanhe e execute comandos diretamente no host do servidor (VPS/WSL) como root.</span>
+            <h2>Console do Sistema</h2>
+            <span class="section-description">Acompanhe e execute comandos diretamente no host do servidor como root.</span>
           </div>
         </div>
 
@@ -472,7 +599,7 @@
               <thead>
                 <tr>
                   <th>E-mail</th>
-                  <th>Cota (MB)</th>
+                  <th>Cota</th>
                   <th>Data de Criação</th>
                   <th style="text-align: right;">Ações</th>
                 </tr>
@@ -492,7 +619,7 @@
       <section class="tab-pane" id="tab-crons">
         <div class="section-header">
           <div class="section-title-wrapper">
-            <h2>Tarefas Agendadas (Cron Jobs)</h2>
+            <h2>Tarefas Agendadas</h2>
             <span class="section-description">Agende a execução de comandos ou scripts automáticos no servidor.</span>
           </div>
         </div>
@@ -506,16 +633,16 @@
                 <label class="form-label" for="cron-preset">Predefinições Comuns</label>
                 <select class="form-select" id="cron-preset" onchange="applyCronPreset(this.value)">
                   <option value="">-- Personalizado --</option>
-                  <option value="* * * * *">A cada minuto (* * * * *)</option>
-                  <option value="*/5 * * * *">A cada 5 minutos (*/5 * * * *)</option>
-                  <option value="0 * * * *">A cada hora (0 * * * *)</option>
-                  <option value="0 0 * * *">Todos os dias (Meia-noite) (0 0 * * *)</option>
-                  <option value="0 0 * * 0">Todas as semanas (Domingo) (0 0 * * 0)</option>
-                  <option value="0 0 1 * *">Todos os meses (1º Dia) (0 0 1 * *)</option>
+                  <option value="* * * * *">A cada minuto</option>
+                  <option value="*/5 * * * *">A cada 5 minutos</option>
+                  <option value="0 * * * *">A cada hora</option>
+                  <option value="0 0 * * *">Todos os dias à meia-noite</option>
+                  <option value="0 0 * * 0">Todas as semanas ao domingo</option>
+                  <option value="0 0 1 * *">No primeiro dia do mês</option>
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label" for="cron-schedule">Agendamento (Cron Expression)</label>
+                <label class="form-label" for="cron-schedule">Agendamento</label>
                 <input class="form-input" type="text" id="cron-schedule" placeholder="Ex: */5 * * * *" required>
                 <small style="color: var(--text-muted); font-size: 11px;">Minuto Hora Dia Mês Dia_da_Semana</small>
               </div>
@@ -597,7 +724,7 @@
 
           <!-- Fail2ban -->
           <div class="glass-card">
-            <h3>Ataques Bloqueados (Fail2ban)</h3>
+            <h3>Ataques Bloqueados</h3>
             <div style="height: 16px;"></div>
             <pre id="fail2ban-status-box" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; font-family: var(--font-mono); font-size: 12px; height: 254px; overflow-y: auto; white-space: pre-wrap; border: 1px solid var(--border-color);"></pre>
           </div>
@@ -641,7 +768,7 @@
         <div class="section-header">
           <div class="section-title-wrapper">
             <h2>Gestão de Utilizadores</h2>
-            <span class="section-description">Crie e administre sub-contas com diferentes níveis de acesso (Admin / Client).</span>
+            <span class="section-description">Crie e administre sub-contas com diferentes níveis de acesso.</span>
           </div>
           <button class="btn-primary" onclick="openModal('modal-create-user')">
             + Novo Utilizador
@@ -657,7 +784,7 @@
                 <thead>
                   <tr>
                     <th>Nome de Utilizador</th>
-                    <th>Nível (Função)</th>
+                    <th>Nível de Acesso</th>
                     <th>Google 2FA</th>
                     <th style="text-align: right;">Ações</th>
                   </tr>
@@ -672,7 +799,7 @@
           <!-- Meu 2FA (Segurança da conta logada) -->
           <div class="glass-card">
             <h3>Segurança da Conta</h3>
-            <p style="font-size: 13px; color: var(--text-secondary); margin: 12px 0 20px;">Proteja a sua sessão ativando a Autenticação em Duas Etapas (2FA) do Google Authenticator.</p>
+            <p style="font-size: 13px; color: var(--text-secondary); margin: 12px 0 20px;">Proteja a sua sessão ativando a Autenticação em Duas Etapas com o Google Authenticator.</p>
             
             <div id="2fa-status-container" style="display: flex; flex-direction: column; gap: 14px; align-items: center; text-align: center;">
               <!-- Atualizado via JS -->
@@ -778,6 +905,31 @@
             </div>
           </div>
         </div>
+
+        <!-- Card: Histórico de Acessos -->
+        <div class="glass-card" style="margin-top: 24px;">
+          <h3 style="font-size: 15px; margin-bottom: 6px;">Histórico de Acessos</h3>
+          <p style="font-size: 12px; color: var(--text-secondary); margin-bottom: 16px;">Consulte os locais, IPs e dispositivos que acederam à sua conta BCP ultimamente. Localizações desconhecidas são sinalizadas para a sua segurança.</p>
+          
+          <div class="custom-table-container">
+            <table class="custom-table" style="font-size: 12px;">
+              <thead>
+                <tr>
+                  <th>Data / Hora</th>
+                  <th>Endereço IP</th>
+                  <th>Localização</th>
+                  <th>Dispositivo / Browser</th>
+                  <th style="text-align: right;">Estado</th>
+                </tr>
+              </thead>
+              <tbody id="profile-login-history-body">
+                <tr>
+                  <td colspan="5" style="text-align: center; color: var(--text-muted);">A carregar histórico de acessos...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </section>
     </main>
   </div>
@@ -802,18 +954,18 @@
           <div class="form-group">
             <label class="form-label" for="site-type">Tipo de Website</label>
             <select class="form-select" id="site-type" onchange="toggleSitePhpField()">
-              <option value="php">PHP (Padrão)</option>
+              <option value="php">PHP Padrão</option>
               <option value="wordpress">WordPress</option>
               <option value="react">React SPA</option>
-              <option value="static">Estático (HTML/CSS/JS)</option>
-              <option value="python">🐍 Python Web Application (Flask/FastAPI)</option>
+              <option value="static">Website Estático</option>
+              <option value="python">🐍 Python Web Application</option>
             </select>
           </div>
           <div class="form-group" id="site-php-ver-group">
             <label class="form-label" for="site-php-ver">Versão PHP</label>
             <select class="form-select" id="site-php-ver">
-              <option value="8.2">PHP 8.2 (Estável)</option>
-              <option value="8.3">PHP 8.3 (Novo)</option>
+              <option value="8.2">PHP 8.2 Estável</option>
+              <option value="8.3">PHP 8.3</option>
             </select>
           </div>
         </div>
@@ -873,8 +1025,8 @@
             <input type="password" class="form-input" id="email-pass" placeholder="Senha do e-mail" required>
           </div>
           <div class="form-group">
-            <label class="form-label" for="email-quota">Cota Máxima (MB)</label>
-            <input type="number" class="form-input" id="email-quota" value="1024" min="100" required>
+            <label class="form-label" for="email-quota">Cota Máxima</label>
+            <input type="number" class="form-input" id="email-quota" value="1024" min="100" placeholder="ex: 1024 MB" required>
           </div>
         </div>
         <div class="modal-footer">
@@ -893,7 +1045,7 @@
         <button class="modal-close" onclick="closeModal('modal-dns-records')">&times;</button>
       </div>
       <div class="modal-body">
-        <p style="font-size: 13px; color: var(--text-secondary);">Para garantir que os seus e-mails cheguem à caixa de entrada (Gmail/Outlook) sem cair em SPAM, configure os registros TXT, A e MX abaixo na sua zona DNS (Cloudflare, Registro.br, etc.):</p>
+        <p style="font-size: 13px; color: var(--text-secondary);">Para garantir que os seus e-mails cheguem à caixa de entrada sem cair em SPAM, configure os registros TXT, A e MX abaixo na sua zona DNS (como Cloudflare, Registro.br, entre outros):</p>
         <div class="custom-table-container">
           <table class="custom-table" style="font-size: 12px;">
             <thead>
@@ -943,14 +1095,14 @@
   <div class="modal-overlay" id="modal-chmod">
     <div class="modal-box">
       <div class="modal-header">
-        <h3 class="modal-title">Alterar Permissões (Chmod)</h3>
+        <h3 class="modal-title">Alterar Permissões</h3>
         <button class="modal-close" onclick="closeModal('modal-chmod')">&times;</button>
       </div>
       <form id="chmod-form">
         <input type="hidden" id="chmod-file-path">
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label" for="chmod-mode">Valor das Permissões (Octal)</label>
+            <label class="form-label" for="chmod-mode">Valor das Permissões</label>
             <input type="text" class="form-input" id="chmod-mode" placeholder="Ex: 755 ou 644" maxlength="3" required>
           </div>
         </div>
@@ -978,7 +1130,7 @@
             <button class="btn-secondary" style="padding: 4px 8px; font-size: 12px; height: 30px;" onclick="zoomEditor(-1)" title="Diminuir Fonte">A-</button>
             <button class="btn-secondary" style="padding: 4px 8px; font-size: 12px; height: 30px;" onclick="toggleEditorFullscreen()" id="btn-editor-fullscreen" title="Ecrã Inteiro">Full</button>
             <button class="btn-primary" style="padding: 6px 12px; font-size: 13px;" onclick="saveCurrentFile()">
-              Salvar (Ctrl+S)
+              Salvar
             </button>
             <button class="modal-close" onclick="closeEditorModal()">&times;</button>
           </div>
@@ -1008,8 +1160,8 @@
           <div class="form-group">
             <label class="form-label" for="new-user-role">Nível de Acesso</label>
             <select class="form-select" id="new-user-role">
-              <option value="client">Client (Hospedagem Básica)</option>
-              <option value="admin">Admin (Acesso Total)</option>
+              <option value="client">Cliente</option>
+              <option value="admin">Administrador</option>
             </select>
           </div>
         </div>
@@ -1111,7 +1263,7 @@
         <input type="hidden" id="change-email-quota-id">
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label" for="change-email-new-quota">Nova Cota Máxima (MB)</label>
+            <label class="form-label" for="change-email-new-quota">Nova Cota Máxima</label>
             <input type="number" class="form-input" id="change-email-new-quota" min="100" placeholder="ex: 2048" required>
           </div>
         </div>
@@ -1229,26 +1381,33 @@
           <div class="form-group">
             <label class="form-label" for="game-server-type">Tipo de Jogo</label>
             <select class="form-select" id="game-server-type">
-              <option value="minecraft">🎮 Minecraft Java Edition (Online/Offline)</option>
+              <option value="minecraft">🎮 Minecraft Java Edition</option>
               <option value="fivem">🏎️ FiveM GTA V Server</option>
-              <option value="mta">🏍️ Multi Theft Auto: San Andreas (MTA:SA)</option>
-              <option value="cs2">🔫 Counter-Strike 2 (CS2)</option>
+              <option value="mta">🏍️ Multi Theft Auto: San Andreas</option>
+              <option value="cs2">🔫 Counter-Strike 2</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="game-server-node-id">Nó de Execução</label>
+            <select class="form-select" id="game-server-node-id">
+              <option value="">🖥️ Servidor Local</option>
             </select>
           </div>
 
           <div class="grid-layout" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
             <div class="form-group">
-              <label class="form-label" for="game-server-ram">Limite de RAM (MB)</label>
-              <input type="number" class="form-input" id="game-server-ram" value="1024" min="256" step="256" required>
+              <label class="form-label" for="game-server-ram">Limite de RAM</label>
+              <input type="number" class="form-input" id="game-server-ram" value="1024" min="256" step="256" placeholder="ex: 1024 MB" required>
               <small style="color: var(--text-muted); font-size: 11px;">Mínimo recomendado: 1024MB para Minecraft.</small>
             </div>
             <div class="form-group">
-              <label class="form-label" for="game-server-cpu">Limite de CPU (Cores)</label>
+              <label class="form-label" for="game-server-cpu">Limite de CPU</label>
               <select class="form-select" id="game-server-cpu">
-                <option value="0.5">0.5 Cores (Leve)</option>
-                <option value="1.0" selected>1.0 Core (Padrão)</option>
-                <option value="2.0">2.0 Cores (Alta performance)</option>
-                <option value="4.0">4.0 Cores (Ultra/Máximo)</option>
+                <option value="0.5">0.5 Cores</option>
+                <option value="1.0" selected>1.0 Core</option>
+                <option value="2.0">2.0 Cores</option>
+                <option value="4.0">4.0 Cores</option>
               </select>
             </div>
           </div>
@@ -1256,6 +1415,44 @@
         <div class="modal-footer">
           <button type="button" class="btn-secondary" onclick="closeModal('modal-create-game-server')">Cancelar</button>
           <button type="submit" class="btn-primary">Provisionar Container</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Adicionar Nó (Wings) -->
+  <div class="modal-overlay" id="modal-add-node">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 class="modal-title">Adicionar Novo Nó</h3>
+        <button class="modal-close" onclick="closeModal('modal-add-node')">&times;</button>
+      </div>
+      <form id="create-node-form">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label" for="node-name">Nome do Nó</label>
+            <input type="text" class="form-input" id="node-name" placeholder="Ex: Canada-Node-01" required>
+          </div>
+          
+          <div class="form-group">
+            <label class="form-label" for="node-ip">Endereço IP / Hostname</label>
+            <input type="text" class="form-input" id="node-ip" placeholder="Ex: 127.0.0.1 ou node1.exemplo.com" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="node-port">Porta do Wings Daemon</label>
+            <input type="number" class="form-input" id="node-port" value="8080" required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="node-secret">Segredo do Token Daemon</label>
+            <input type="password" class="form-input" id="node-secret" placeholder="Cole a chave secreta gerada para o daemon" required>
+            <small style="color: var(--text-muted); font-size: 11px;">Esta chave é utilizada para assinar os tokens JWT e comunicar com o daemon Wings com segurança.</small>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary" onclick="closeModal('modal-add-node')">Cancelar</button>
+          <button type="submit" class="btn-primary">Adicionar Nó</button>
         </div>
       </form>
     </div>
@@ -1346,6 +1543,20 @@
           <button class="btn-primary" id="site-console-send-btn" onclick="sendSiteConsoleCommand()" style="padding: 0 20px;">Enviar</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal Overlay de Atualização -->
+  <div class="modal-overlay" id="modal-updating-overlay" style="display: none; background: rgba(0,0,0,0.9); z-index: 10000; align-items: center; justify-content: center; text-align: center;">
+    <style>
+      @keyframes bcp-spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 20px;">
+      <div class="loading-spinner" style="width: 50px; height: 50px; border: 4px solid rgba(255,255,255,0.1); border-top-color: var(--color-primary); border-radius: 50%; animation: bcp-spin 1s linear infinite;"></div>
+      <h2 style="color: #ffffff; font-family: var(--font-heading); font-size: 20px; font-weight: 600;">Atualizando o Painel</h2>
+      <p style="color: var(--text-secondary); font-size: 13px; max-width: 300px;">Por favor, aguarde alguns instantes. O BCP está a descarregar as novidades e a reiniciar os serviços...</p>
     </div>
   </div>
 

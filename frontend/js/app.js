@@ -1,9 +1,17 @@
 let wsConnection = null;
+let remoteConsoleWs = null;
+let terminalOffset = 0;
+const terminalLimit = 100;
+let terminalHasMore = true;
+let terminalIsLoading = false;
 
 // Modal global functions
 window.openModal = function(id) {
   const modal = document.getElementById(id);
   if (modal) modal.classList.add('active');
+  if (id === 'modal-create-game-server') {
+    populateNodesDropdown();
+  }
 };
 window.closeModal = function(id) {
   const modal = document.getElementById(id);
@@ -14,6 +22,12 @@ window.closeModal = function(id) {
   if (id === 'modal-game-console' || id === 'modal-site-console') {
     if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
       wsConnection.send(JSON.stringify({ type: 'close_console' }));
+    }
+    if (remoteConsoleWs) {
+      try {
+        remoteConsoleWs.close();
+      } catch (e) {}
+      remoteConsoleWs = null;
     }
   }
 };
@@ -118,6 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
   connectWebSocket();
   setupForms();
   setupGamesForms();
+  setupNodesForms();
   setupProfileForms();
   
   // Carrega perfil e atualiza avatar
@@ -127,7 +142,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const role = localStorage.getItem('bcp_role');
   if (role === 'admin') {
     const navUsers = document.getElementById('nav-item-users');
-    if (navUsers) navUsers.style.display = 'flex';
+    if (navUsers) navUsers.style.display = '';
   }
 
   // Se houver um hash no URL (migração/compatibilidade), redireciona para a rota limpa
@@ -167,9 +182,21 @@ function setupNavigation() {
 }
 
 window.handleRouting = function() {
+  // Remover os estilos de roteamento rápido para evitar conflitos posteriores
+  const earlyTabStyle = document.getElementById('early-active-tab-style');
+  if (earlyTabStyle) earlyTabStyle.remove();
+  const earlySidebarStyle = document.getElementById('early-active-sidebar-style');
+  if (earlySidebarStyle) earlySidebarStyle.remove();
+
   // Fecha todos os modais ao mudar de página/aba
   if (typeof window.closeAllModals === 'function') {
     window.closeAllModals();
+  }
+
+  // Limpar auto-refresh de processos ao navegar
+  if (window.processesIntervalId) {
+    clearInterval(window.processesIntervalId);
+    window.processesIntervalId = null;
   }
 
   let path = window.location.pathname.substring(1) || 'dashboard';
@@ -235,6 +262,7 @@ window.handleRouting = function() {
         window.performanceChart.update('none');
       }
       loadGameDashboard(); // Carrega estatísticas do Docker/Jogos junto no dashboard principal
+      checkPanelVersion(); // Verifica a versão do painel no GitHub
       break;
     case 'sites':
       loadSites();
@@ -268,6 +296,14 @@ window.handleRouting = function() {
       break;
     case 'game-servers':
       loadGameServers();
+      break;
+    case 'nodes':
+      loadNodes();
+      break;
+    case 'processes':
+      loadProcesses();
+      // Auto-refresh a cada 2 segundos quando nesta aba
+      window.processesIntervalId = setInterval(loadProcesses, 2000);
       break;
     case 'console':
       loadRootConsole();
@@ -357,11 +393,11 @@ function connectWebSocket() {
             if (consoleBox.innerHTML.includes('Carregando logs')) {
               consoleBox.innerHTML = '';
             }
-            const isScrolledToBottom = consoleBox.scrollHeight - consoleBox.clientHeight <= consoleBox.scrollTop + 50;
+            const isScrolledToBottom = consoleBox.scrollHeight - consoleBox.clientHeight <= consoleBox.scrollTop + 100;
             const span = document.createElement('span');
             span.textContent = msg.data;
             consoleBox.appendChild(span);
-            if (isScrolledToBottom) {
+            if (isScrolledToBottom || consoleBox.childNodes.length <= 10) {
               consoleBox.scrollTop = consoleBox.scrollHeight;
             }
           }
@@ -372,7 +408,7 @@ function connectWebSocket() {
           if (consoleBox.innerHTML.includes('Conectando ao terminal')) {
             consoleBox.innerHTML = '';
           }
-          const isScrolledToBottom = consoleBox.scrollHeight - consoleBox.clientHeight <= consoleBox.scrollTop + 50;
+          const isScrolledToBottom = consoleBox.scrollHeight - consoleBox.clientHeight <= consoleBox.scrollTop + 100;
 
           // Divide a mensagem por quebras de linha para estilizar cada uma individualmente
           const lines = msg.data.split('\n');
@@ -397,7 +433,7 @@ function connectWebSocket() {
             consoleBox.appendChild(div);
           });
 
-          if (isScrolledToBottom) {
+          if (isScrolledToBottom || consoleBox.childNodes.length <= 120) {
             consoleBox.scrollTop = consoleBox.scrollHeight;
           }
 
@@ -1394,16 +1430,23 @@ window.loadGameServers = async function() {
         statusBadge = `<span class="badge badge-danger">ERRO</span>`;
       }
 
+      const nodeBadge = srv.node_name 
+        ? `<span class="badge badge-warning" style="font-size:10px; padding:2px 6px; margin-left:6px; opacity:0.8;">WINGS: ${srv.node_name}</span>`
+        : `<span class="badge badge-success" style="font-size:10px; padding:2px 6px; margin-left:6px; opacity:0.8;">LOCAL</span>`;
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${srv.name}</strong></td>
+        <td>
+          <strong>${srv.name}</strong>
+          <div style="margin-top: 4px;">${nodeBadge}</div>
+        </td>
         <td><span style="font-family: var(--font-mono); font-size:12px; color: var(--color-secondary);">${srv.game_type.toUpperCase()}</span></td>
         <td><strong style="font-family: var(--font-mono);">${srv.host_port}</strong></td>
         <td>RAM: ${srv.ram_limit_mb}MB / CPU: ${srv.cpu_limit}x</td>
         <td>CPU: ${srv.cpu_usage || '0%'} / RAM: ${srv.ram_usage || '0MB'}</td>
         <td>${statusBadge}</td>
         <td style="text-align: right;">
-          <button class="btn-secondary" style="display:inline-flex; padding:6px 12px; font-size:12px; margin-right:6px;" onclick="openGameConsole(${srv.id}, '${srv.name}', ${srv.host_port}, '${srv.status}', '${srv.container_id}')">
+          <button class="btn-secondary" style="display:inline-flex; padding:6px 12px; font-size:12px; margin-right:6px;" onclick="openGameConsole(${srv.id}, '${srv.name}', ${srv.host_port}, '${srv.status}', '${srv.container_id}', ${srv.ram_limit_mb})">
             Consola
           </button>
           <button class="btn-secondary" style="display:inline-flex; padding:6px 12px; font-size:12px; margin-right:6px;" onclick="openGameFiles(${srv.id}, '${srv.name}')">
@@ -1459,17 +1502,18 @@ window.deleteGameServer = async function(id, name) {
   } catch (err) {}
 };
 
-window.openGameConsole = function(id, name, hostPort, status, containerId) {
+window.openGameConsole = function(id, name, hostPort, status, containerId, ramLimit) {
   window.selectedGameServerId = id;
   window.selectedGameServerName = name;
   window.selectedGameServerPort = hostPort;
   window.selectedGameServerDockerId = containerId;
+  window.selectedGameServerRamLimit = ramLimit || 1024;
 
   openModal('modal-game-console');
   loadGameConsole(id, name);
 };
 
-window.loadGameConsole = function(id, name) {
+window.loadGameConsole = async function(id, name) {
   document.getElementById('game-console-servername').innerText = name;
   
   const consoleBox = document.getElementById('game-console-box');
@@ -1495,16 +1539,103 @@ window.loadGameConsole = function(id, name) {
     `;
   }
 
-  // Assina o stream WebSocket para logs do console
-  if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
-    wsConnection.send(JSON.stringify({
-      type: 'join_console',
-      gameServerId: id
-    }));
+  // Fecha qualquer conexão remota anterior
+  if (remoteConsoleWs) {
+    try {
+      remoteConsoleWs.close();
+    } catch (e) {}
+    remoteConsoleWs = null;
   }
 
-  // Inicializa estatísticas dinâmicas na barra lateral do console
-  startGameStatsPolling(id);
+  try {
+    const config = await apiGet(`/games/${id}/console`);
+    if (config && config.is_remote) {
+      console.log('[WS-REMOTE] Conectando diretamente ao daemon Wings:', config.ip_address, config.api_port);
+      
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const remoteWsUrl = `${protocol}//${config.ip_address}:${config.api_port}/?token=${config.token}&gameServerId=${id}`;
+      
+      remoteConsoleWs = new WebSocket(remoteWsUrl);
+      
+      remoteConsoleWs.onopen = () => {
+        console.log('[WS-REMOTE] Conectado com sucesso ao nó remoto.');
+        if (consoleBox) {
+          consoleBox.innerHTML = `<div style="color: var(--color-primary);">[Conectado ao nó Wings ${config.ip_address}] Carregando logs...\n</div>`;
+        }
+      };
+      
+      remoteConsoleWs.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'console_log') {
+            if (consoleBox) {
+              if (consoleBox.innerHTML.includes('Conectando ao console') || consoleBox.innerHTML.includes('Carregando logs')) {
+                consoleBox.innerHTML = '';
+              }
+              const isScrolledToBottom = consoleBox.scrollHeight - consoleBox.clientHeight <= consoleBox.scrollTop + 50;
+              const span = document.createElement('span');
+              span.textContent = msg.data;
+              consoleBox.appendChild(span);
+              if (isScrolledToBottom) {
+                consoleBox.scrollTop = consoleBox.scrollHeight;
+              }
+            }
+          } else if (msg.type === 'metrics') {
+            document.getElementById('game-console-cpu-val').innerText = msg.cpu || '0%';
+            document.getElementById('game-console-cpu-bar').style.width = msg.cpu || '0%';
+            
+            document.getElementById('game-console-ram-val').innerText = msg.ram || '0 MB';
+            const used = parseFloat(msg.ram) || 0;
+            const limit = window.selectedGameServerRamLimit || 1024;
+            const pct = Math.min(100, (used / limit) * 100);
+            document.getElementById('game-console-ram-bar').style.width = `${pct}%`;
+          }
+        } catch (e) {
+          console.error('[WS-REMOTE] Erro ao processar mensagem do daemon:', e);
+        }
+      };
+      
+      remoteConsoleWs.onclose = () => {
+        console.log('[WS-REMOTE] Conexão encerrada com o nó remoto.');
+      };
+      
+      remoteConsoleWs.onerror = (err) => {
+        console.error('[WS-REMOTE] Erro na conexão:', err);
+        if (consoleBox) {
+          consoleBox.innerHTML += `<div style="color: var(--color-danger);">[ERRO] Falha ao conectar ao daemon Wings do host ${config.ip_address}.\n</div>`;
+        }
+      };
+      
+      // Limpa estatísticas iniciais
+      document.getElementById('game-console-cpu-val').innerText = '0%';
+      document.getElementById('game-console-cpu-bar').style.width = '0%';
+      document.getElementById('game-console-ram-val').innerText = '0 MB';
+      document.getElementById('game-console-ram-bar').style.width = '0%';
+      document.getElementById('game-console-port-val').innerText = window.selectedGameServerPort || '-';
+      document.getElementById('game-console-dockerid-val').innerText = (window.selectedGameServerDockerId || '').substring(0, 12) || '-';
+
+    } else {
+      // Servidor local: usa a conexão WebSocket do painel padrão
+      if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+        wsConnection.send(JSON.stringify({
+          type: 'join_console',
+          gameServerId: id
+        }));
+      }
+      
+      // Inicializa estatísticas locais via polling
+      startGameStatsPolling(id);
+    }
+  } catch (err) {
+    console.error('Erro ao buscar configuração do console:', err);
+    if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+      wsConnection.send(JSON.stringify({
+        type: 'join_console',
+        gameServerId: id
+      }));
+    }
+    startGameStatsPolling(id);
+  }
 };
 
 window.sendConsoleCommand = function() {
@@ -1513,6 +1644,14 @@ window.sendConsoleCommand = function() {
 
   const cmd = inputEl.value.trim();
   inputEl.value = '';
+
+  if (remoteConsoleWs && remoteConsoleWs.readyState === WebSocket.OPEN) {
+    remoteConsoleWs.send(JSON.stringify({
+      type: 'command',
+      command: cmd
+    }));
+    return;
+  }
 
   if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
     wsConnection.send(JSON.stringify({
@@ -1620,10 +1759,11 @@ window.setupGamesForms = function() {
     const game_type = document.getElementById('game-server-type').value;
     const ram_limit_mb = document.getElementById('game-server-ram').value;
     const cpu_limit = document.getElementById('game-server-cpu').value;
+    const node_id = document.getElementById('game-server-node-id').value || null;
 
     try {
       showToast('Iniciando criação do servidor de jogo...', 'info');
-      const res = await apiPost('/games/create', { name, game_type, ram_limit_mb, cpu_limit });
+      const res = await apiPost('/games/create', { name, game_type, ram_limit_mb, cpu_limit, node_id });
       if (res) {
         showToast(res.message, 'success');
         newForm.reset();
@@ -1670,7 +1810,7 @@ function animateValue(elementId, endValue, duration = 800, suffix = '') {
   activeNumberAnimations[elementId] = requestAnimationFrame(updateNumber);
 }
 
-window.loadRootConsole = function() {
+window.loadRootConsole = async function() {
   const consoleBox = document.getElementById('root-console-box');
   const inputEl = document.getElementById('root-console-input');
   
@@ -1693,10 +1833,59 @@ window.loadRootConsole = function() {
     sendBtn.disabled = true;
   }
 
+  // Reseta estado do lazy loading
+  terminalOffset = 0;
+  terminalHasMore = true;
+  terminalIsLoading = false;
+
+  // Carrega as primeiras linhas (histórico recente)
+  try {
+    const res = await apiGet(`/terminal/history?offset=0&limit=${terminalLimit}`);
+    if (consoleBox) {
+      consoleBox.innerHTML = '';
+    }
+    if (res && res.lines && res.lines.length > 0) {
+      res.lines.forEach(line => {
+        const div = document.createElement('div');
+        div.style.lineHeight = '1.6';
+        div.style.whiteSpace = 'pre-wrap';
+        
+        const isCommand = /^\[[^\]]+\]\s+[a-zA-Z0-9_-]+:/.test(line);
+        if (isCommand) {
+          div.style.color = '#00d2ff';
+          div.style.fontWeight = '500';
+        } else {
+          div.style.color = '#ffffff';
+        }
+        div.textContent = line + '\n';
+        consoleBox.appendChild(div);
+      });
+      
+      // Ajusta o offset inicial
+      terminalOffset = res.lines.length;
+      terminalHasMore = res.hasMore;
+
+      // Scroll para a última linha (final do terminal)
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+    }
+  } catch (err) {
+    console.error('Erro ao buscar histórico inicial:', err);
+  }
+
+  // Conecta ao stream WebSocket
   if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
     wsConnection.send(JSON.stringify({
       type: 'join_root_console'
     }));
+  }
+
+  // Configura escutador de scroll para lazy loading
+  if (consoleBox) {
+    consoleBox.onscroll = () => {
+      if (consoleBox.scrollTop === 0) {
+        loadOlderTerminalLogs();
+      }
+    };
   }
 };
 
@@ -1706,6 +1895,14 @@ window.sendRootConsoleCommand = function() {
 
   const cmd = inputEl.value.trim();
   inputEl.value = '';
+
+  // Limpa instantaneamente a consola no ecrã do cliente
+  if (cmd.toLowerCase() === 'clear' || cmd.toLowerCase() === 'cls') {
+    const consoleBox = document.getElementById('root-console-box');
+    if (consoleBox) {
+      consoleBox.innerHTML = '';
+    }
+  }
 
   if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
     wsConnection.send(JSON.stringify({
@@ -1851,6 +2048,7 @@ window.loadUserProfile = async function() {
           sidebarAvatar.style.background = 'var(--bg-panel-hover)';
         }
       }
+      loadLoginHistory();
     }
   } catch (err) {
     console.error('Erro ao carregar perfil:', err);
@@ -1972,5 +2170,444 @@ document.addEventListener('keydown', (e) => {
     }
   }
 });
+
+// ==========================================
+// MÓDULO DE NÓS DE SERVIDOR (WINGS)
+// ==========================================
+async function populateNodesDropdown() {
+  const select = document.getElementById('game-server-node-id');
+  if (!select) return;
+
+  try {
+    const nodes = await apiGet('/nodes');
+    select.innerHTML = '<option value="">🖥️ Servidor Local (Docker Principal)</option>';
+    nodes.forEach(node => {
+      const option = document.createElement('option');
+      option.value = node.id;
+      option.textContent = `🖥️ ${node.name} (${node.ip_address}:${node.api_port})`;
+      select.appendChild(option);
+    });
+  } catch (err) {
+    console.error('Erro ao buscar nós para o dropdown:', err);
+  }
+}
+
+window.loadNodes = async function() {
+  const container = document.getElementById('nodes-list-body');
+  if (!container) return;
+
+  try {
+    const nodes = await apiGet('/nodes');
+    if (!nodes || nodes.length === 0) {
+      container.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Nenhum nó de servidor cadastrado.</td></tr>`;
+      return;
+    }
+
+    container.innerHTML = '';
+    nodes.forEach(node => {
+      const tr = document.createElement('tr');
+      const maskedSecret = node.daemon_token_secret.substring(0, 6) + '...' + node.daemon_token_secret.substring(node.daemon_token_secret.length - 4);
+      const dateStr = new Date(node.created_at).toLocaleString();
+
+      tr.innerHTML = `
+        <td><strong>${node.name}</strong></td>
+        <td><span style="font-family: var(--font-mono); font-size:12px; color: var(--color-secondary);">${node.ip_address}</span></td>
+        <td><strong style="font-family: var(--font-mono);">${node.api_port}</strong></td>
+        <td><span style="font-family: var(--font-mono); font-size: 11px; opacity: 0.6;">${maskedSecret}</span></td>
+        <td><span style="font-size: 12px; color: var(--text-secondary);">${dateStr}</span></td>
+        <td style="text-align: right;">
+          <button class="btn-danger-outline" onclick="deleteNode(${node.id}, '${node.name}')">
+            Remover
+          </button>
+        </td>
+      `;
+      container.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('Erro ao carregar nós:', err);
+    container.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--color-danger);">Erro ao carregar nós de servidor.</td></tr>`;
+  }
+};
+
+window.deleteNode = async function(id, name) {
+  if (!confirm(`Tem certeza de que deseja remover o nó "${name}"? Servidores associados a este nó poderão falhar ao comunicar.`)) {
+    return;
+  }
+
+  try {
+    const res = await apiPost('/nodes/delete', { id });
+    if (res) {
+      showToast(res.message, 'success');
+      loadNodes();
+    }
+  } catch (err) {
+    console.error('Erro ao excluir nó:', err);
+  }
+};
+
+window.setupNodesForms = function() {
+  const form = document.getElementById('create-node-form');
+  if (!form) return;
+
+  const newForm = form.cloneNode(true);
+  form.parentNode.replaceChild(newForm, form);
+
+  newForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById('node-name').value;
+    const ipAddress = document.getElementById('node-ip').value;
+    const apiPort = parseInt(document.getElementById('node-port').value, 10);
+    const daemonTokenSecret = document.getElementById('node-secret').value;
+
+    try {
+      showToast('A registrar novo nó de servidor...', 'info');
+      const res = await apiPost('/nodes/create', { name, ipAddress, apiPort, daemonTokenSecret });
+      if (res) {
+        showToast(res.message, 'success');
+        newForm.reset();
+        closeModal('modal-add-node');
+        loadNodes();
+      }
+    } catch (err) {}
+  });
+};
+
+async function loadOlderTerminalLogs() {
+  if (terminalIsLoading || !terminalHasMore) return;
+  
+  const consoleBox = document.getElementById('root-console-box');
+  if (!consoleBox) return;
+
+  terminalIsLoading = true;
+  
+  // Guardamos a altura atual e scrolltop antes de inserir logs antigos
+  const previousScrollHeight = consoleBox.scrollHeight;
+  const previousScrollTop = consoleBox.scrollTop;
+
+  try {
+    const res = await apiGet(`/terminal/history?offset=${terminalOffset}&limit=${terminalLimit}`);
+    if (res && res.lines) {
+      if (res.lines.length === 0) {
+        terminalHasMore = false;
+        terminalIsLoading = false;
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      res.lines.forEach(line => {
+        const div = document.createElement('div');
+        div.style.lineHeight = '1.6';
+        div.style.whiteSpace = 'pre-wrap';
+        
+        const isCommand = /^\[[^\]]+\]\s+[a-zA-Z0-9_-]+:/.test(line);
+        if (isCommand) {
+          div.style.color = '#00d2ff';
+          div.style.fontWeight = '500';
+        } else {
+          div.style.color = '#ffffff';
+        }
+        div.textContent = line + '\n';
+        fragment.appendChild(div);
+      });
+
+      // Insere no início do terminal
+      consoleBox.insertBefore(fragment, consoleBox.firstChild);
+
+      // Incrementa o offset
+      terminalOffset += res.lines.length;
+      terminalHasMore = res.hasMore;
+
+      // Ajusta o scrolltop para manter a mesma posição visual
+      const newScrollHeight = consoleBox.scrollHeight;
+      consoleBox.scrollTop = previousScrollTop + (newScrollHeight - previousScrollHeight);
+    }
+  } catch (err) {
+    console.error('Erro ao carregar histórico antigo do terminal:', err);
+  } finally {
+    terminalIsLoading = false;
+  }
+}
+
+// ==========================================
+// MÓDULO DE GESTÃO DE PROCESSOS (TASK MANAGER)
+// ==========================================
+window.loadProcesses = async function() {
+  const container = document.getElementById('processes-list-body');
+  if (!container) return;
+
+  try {
+    const data = await apiGet('/system/processes');
+    const list = data.processes || [];
+    const sentinelEnabled = data.sentinelEnabled;
+
+    // Atualiza o estado visual do Sentinela
+    const statusCard = document.getElementById('sentinel-status-card');
+    const statusDot = document.getElementById('sentinel-status-dot');
+    const statusText = document.getElementById('sentinel-status-text');
+    const toggleBtn = document.getElementById('btn-toggle-sentinel');
+
+    if (statusCard && statusDot && statusText && toggleBtn) {
+      window.sentinelEnabled = sentinelEnabled;
+      if (sentinelEnabled) {
+        statusCard.style.borderColor = 'rgba(16, 185, 129, 0.2)';
+        statusCard.style.background = 'linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(0,0,0,0.4))';
+        statusDot.style.backgroundColor = '#10b981';
+        statusDot.style.boxShadow = '0 0 10px #10b981';
+        statusText.innerText = 'Proteção: Ativa';
+        statusText.style.color = '#10b981';
+        toggleBtn.innerText = 'Desativar';
+        toggleBtn.style.background = 'transparent';
+        toggleBtn.style.color = 'var(--color-danger)';
+        toggleBtn.style.border = '1px solid var(--color-danger)';
+      } else {
+        statusCard.style.borderColor = 'rgba(239, 68, 68, 0.2)';
+        statusCard.style.background = 'linear-gradient(135deg, rgba(239, 68, 68, 0.05), rgba(0,0,0,0.4))';
+        statusDot.style.backgroundColor = '#ef4444';
+        statusDot.style.boxShadow = '0 0 10px #ef4444';
+        statusText.innerText = 'Proteção: Desativada';
+        statusText.style.color = '#ef4444';
+        toggleBtn.innerText = 'Ativar';
+        toggleBtn.style.background = '#10b981';
+        toggleBtn.style.color = '#ffffff';
+        toggleBtn.style.border = '1px solid #10b981';
+      }
+    }
+
+    if (!list || list.length === 0) {
+      container.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Nenhum processo ativo encontrado.</td></tr>`;
+      return;
+    }
+
+    container.innerHTML = '';
+    list.forEach(proc => {
+      const tr = document.createElement('tr');
+      
+      // Estilização diferenciada se estiver sob risco elevado ou quarentena
+      if (proc.isQuarantined) {
+        tr.style.opacity = '0.7';
+        tr.style.backgroundColor = 'rgba(239, 68, 68, 0.02)';
+      } else if (proc.crashRisk) {
+        tr.style.backgroundColor = 'rgba(245, 158, 11, 0.02)';
+      }
+
+      tr.innerHTML = `
+        <td><strong style="font-family: var(--font-mono); color: var(--color-primary);">${proc.pid}</strong></td>
+        <td>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="font-family: var(--font-mono); font-size: 13px; font-weight: 500; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${proc.name}">
+              ${proc.name}
+            </div>
+            ${proc.isQuarantined ? `
+              <span style="font-size: 10px; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.4); color: #ef4444; padding: 1px 6px; border-radius: 3px; font-weight: 600; text-transform: uppercase;">Quarentena</span>
+            ` : ''}
+            ${proc.crashRisk && !proc.isQuarantined ? `
+              <span style="font-size: 10px; background: rgba(245, 158, 11, 0.2); border: 1px solid rgba(245, 158, 11, 0.4); color: #f59e0b; padding: 1px 6px; border-radius: 3px; font-weight: 600;" title="Consumo extremo! Risco elevado de crash ou lentidão.">⚠️ Risco Crash</span>
+            ` : ''}
+          </div>
+        </td>
+        <td><span style="font-size: 12px; color: var(--text-secondary);">${proc.user}</span></td>
+        <td><strong style="font-family: var(--font-mono); color: ${proc.crashRisk ? '#f59e0b' : 'var(--color-secondary)'};">${proc.cpu}%</strong></td>
+        <td><span style="font-family: var(--font-mono); opacity: 0.85;">${proc.mem}%</span></td>
+        <td style="text-align: right;">
+          <div style="display: flex; gap: 8px; justify-content: flex-end;">
+            ${proc.isQuarantined ? `
+              <button class="btn-success-outline" style="padding: 4px 10px; font-size: 12px; color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); background: transparent; border-radius: 4px; cursor: pointer;" onclick="resumeProcess(${proc.pid}, '${proc.name.replace(/'/g, "\\'")}')">
+                Libertar
+              </button>
+            ` : `
+              <button class="btn-warning-outline" style="padding: 4px 10px; font-size: 12px; color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.4); background: transparent; border-radius: 4px; cursor: pointer;" onclick="quarantineProcess(${proc.pid}, '${proc.name.replace(/'/g, "\\'")}')">
+                Quarentena
+              </button>
+            `}
+            <button class="btn-danger-outline" style="padding: 4px 10px; font-size: 12px;" onclick="killProcess(${proc.pid}, '${proc.name.replace(/'/g, "\\'")}')">
+              Terminar
+            </button>
+          </div>
+        </td>
+      `;
+      container.appendChild(tr);
+    });
+  } catch (err) {
+    console.error('Erro ao carregar lista de processos:', err);
+    container.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--color-danger);">Erro ao carregar lista de processos.</td></tr>`;
+  }
+};
+
+window.killProcess = async function(pid, name) {
+  if (!confirm(`Tem certeza de que deseja forçar o encerramento do processo "${name}" (PID: ${pid})?`)) {
+    return;
+  }
+
+  try {
+    showToast(`A tentar terminar o processo ${pid}...`, 'info');
+    const res = await apiPost('/system/processes/kill', { pid });
+    if (res) {
+      showToast(res.message, 'success');
+      loadProcesses();
+    }
+  } catch (err) {
+    showToast(err.message || 'Erro ao terminar processo.', 'error');
+  }
+};
+
+window.quarantineProcess = async function(pid, name) {
+  if (!confirm(`Deseja colocar o processo "${name}" (PID: ${pid}) em quarentena?\n\nIsto irá suspender a sua execução imediatamente (SIGSTOP) libertando a CPU, sem terminar o processo definitivamente.`)) {
+    return;
+  }
+
+  try {
+    showToast(`A aplicar quarentena ao processo ${pid}...`, 'info');
+    const res = await apiPost('/system/processes/quarantine', { pid });
+    if (res) {
+      showToast(res.message, 'success');
+      loadProcesses();
+    }
+  } catch (err) {
+    showToast(err.message || 'Erro ao colocar processo em quarentena.', 'error');
+  }
+};
+
+window.resumeProcess = async function(pid, name) {
+  try {
+    showToast(`A libertar o processo ${pid} da quarentena...`, 'info');
+    const res = await apiPost('/system/processes/resume', { pid });
+    if (res) {
+      showToast(res.message, 'success');
+      loadProcesses();
+    }
+  } catch (err) {
+    showToast(err.message || 'Erro ao libertar processo da quarentena.', 'error');
+  }
+};
+
+window.toggleSentinel = async function() {
+  const nextState = !window.sentinelEnabled;
+  try {
+    showToast(nextState ? 'A ativar Sentinela Anti-Crash...' : 'A desativar Sentinela Anti-Crash...', 'info');
+    const res = await apiPost('/system/processes/sentinel', { enabled: nextState });
+    if (res) {
+      showToast(res.message, 'success');
+      loadProcesses();
+    }
+  } catch (err) {
+    showToast(err.message || 'Erro ao alterar estado do Sentinela.', 'error');
+  }
+};
+
+window.loadLoginHistory = async function() {
+  const container = document.getElementById('profile-login-history-body');
+  if (!container) return;
+
+  try {
+    const data = await apiGet('/auth/login-history');
+    if (!data || data.length === 0) {
+      container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhum início de sessão registado.</td></tr>`;
+      return;
+    }
+
+    let html = '';
+    data.forEach(item => {
+      const dateStr = new Date(item.created_at).toLocaleString('pt-PT');
+      const stateBadge = item.is_unknown_location === 1 
+        ? `<span class="badge badge-warning" style="font-size: 10px; padding: 2px 8px; border-radius: 4px; color: #fff;">Novo Local</span>`
+        : `<span class="badge badge-success" style="font-size: 10px; padding: 2px 8px; border-radius: 4px; color: #fff;">Conhecido</span>`;
+      
+      const locText = item.location === 'Rede Local / Localhost' 
+        ? `<span style="color: var(--color-primary); font-weight: 500;">${item.location}</span>`
+        : item.location;
+
+      html += `
+        <tr>
+          <td style="font-family: var(--font-mono); font-size: 11px;">${dateStr}</td>
+          <td style="font-family: var(--font-mono);">${item.ip_address}</td>
+          <td>${locText}</td>
+          <td style="color: var(--text-secondary);">${item.user_agent || '-'}</td>
+          <td style="text-align: right;">${stateBadge}</td>
+        </tr>
+      `;
+    });
+    container.innerHTML = html;
+  } catch (err) {
+    container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Falha ao carregar histórico: ${err.message}</td></tr>`;
+  }
+};
+
+window.checkPanelVersion = async function() {
+  const versionEl = document.getElementById('sys-panel-version');
+  const updateBtn = document.getElementById('btn-update-panel');
+  if (!versionEl) return;
+
+  try {
+    const data = await apiGet('/system/version');
+    if (data) {
+      versionEl.innerText = `v${data.localVersion}`;
+      
+      const role = localStorage.getItem('bcp_role');
+      if (data.updateAvailable && role === 'admin') {
+        versionEl.innerHTML = `v${data.localVersion} <span style="color: var(--color-danger); font-size: 10px; margin-left: 6px;">(Nova: v${data.remoteVersion})</span>`;
+        if (updateBtn) updateBtn.style.display = 'inline-flex';
+      } else {
+        if (updateBtn) updateBtn.style.display = 'none';
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao verificar versão do painel:', err);
+    versionEl.innerText = 'Desconhecida';
+  }
+};
+
+window.updatePanel = async function() {
+  if (!confirm('Deseja realmente atualizar o BestCode CP para a última versão do GitHub?\n\nO painel irá descarregar os ficheiros e reiniciar os serviços. O painel ficará indisponível por alguns segundos.')) {
+    return;
+  }
+
+  const overlay = document.getElementById('modal-updating-overlay');
+  if (overlay) overlay.style.display = 'flex';
+
+  try {
+    showToast('A iniciar processo de atualização...', 'info');
+    const res = await apiPost('/system/update');
+    
+    if (res) {
+      showToast(res.message, 'success');
+      
+      // Começa a tentar reconectar ao servidor periodicamente até voltar a estar online
+      let checkAttempts = 0;
+      const checkInterval = setInterval(async () => {
+        checkAttempts++;
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 1000);
+          
+          const response = await fetch('/api/profile', {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('bcp_token') },
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          if (response.status === 200) {
+            clearInterval(checkInterval);
+            showToast('Painel atualizado e online com sucesso!', 'success');
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+          }
+        } catch (e) {
+          // Ignora falha de rede temporária
+        }
+        
+        if (checkAttempts > 30) {
+          clearInterval(checkInterval);
+          if (overlay) overlay.style.display = 'none';
+          showToast('O servidor está a demorar muito para reiniciar. Por favor, recarregue a página manualmente.', 'warning');
+        }
+      }, 1500);
+    }
+  } catch (err) {
+    if (overlay) overlay.style.display = 'none';
+    showToast(err.message || 'Erro ao iniciar atualização.', 'error');
+  }
+};
 
 
