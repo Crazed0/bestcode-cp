@@ -115,8 +115,9 @@ else
   git clone https://github.com/Crazed0/bestcode-cp.git /opt/bestcode-cp
 fi
 
-# Torna o script de atualização executável
+# Torna os scripts utilitários executáveis
 chmod +x /opt/bestcode-cp/scripts/update.sh
+chmod +x /opt/bestcode-cp/scripts/setup-panel-domain.sh
 
 # Garante que o Git aceita o diretório como confiável para atualizações do root
 git config --global --add safe.directory /opt/bestcode-cp
@@ -418,6 +419,10 @@ echo -e "🛡️  CHAVES DE SEGURANÇA GERADAS (COPIE E GUARDE):"
 echo -e "🔑 Wings Daemon Secret: ${YELLOW}${DAEMON_SECRET}${NC}"
 echo -e "🌐 phpMyAdmin Alias (Aleatório): ${YELLOW}${PMA_PATH}${NC}"
 echo -e "*(Salvo e protegido no servidor em /opt/bestcode-cp/daemon-secret.txt)*"
+echo -e ""
+echo -e "🚀 DOMÍNIO PERSONALIZADO & SSL:"
+echo -e "Para configurar um domínio e ativar SSL (HTTPS) no próprio painel, execute:"
+echo -e "👉 ${GREEN}sudo bash /opt/bestcode-cp/scripts/setup-panel-domain.sh seu-dominio.com${NC}"
 echo -e ""
 echo -e "⚠️  IMPORTANT: Configure o Google 2FA na aba de Utilizadores para máxima segurança."
 echo -e "O phpMyAdmin está integrado e acessível direto pelo painel de Banco de Dados."
