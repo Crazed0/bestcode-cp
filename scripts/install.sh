@@ -82,7 +82,7 @@ DEBIAN_FRONTEND=noninteractive apt install -y pdns-server pdns-backend-mysql
 # Instalar Servidor de E-mail completo (Postfix, Dovecot, OpenDKIM, OpenDMARC, Rspamd)
 echo -e "${YELLOW}Instalando Servidor de E-mail (Postfix, Dovecot, OpenDKIM, OpenDMARC, Rspamd)...${NC}"
 DEBIAN_FRONTEND=noninteractive apt install -y \
-  postfix postfix-mysql \
+  postfix postfix-mysql postfix-sqlite \
   dovecot-core dovecot-imapd dovecot-pop3d dovecot-lmtpd dovecot-sqlite dovecot-mysql \
   opendkim opendkim-tools opendmarc \
   rspamd
@@ -353,6 +353,26 @@ systemctl start bestcode-cp-daemon
 # 8. Configuração de Postfix e Dovecot com SQLite Virtual Maps
 echo -e "${YELLOW}[8/9] Configurando Integração de E-mail com SQLite...${NC}"
 
+# Cria o grupo e o utilizador vmail (virtual mail) com UID/GID 5000 se não existirem
+groupadd -g 5000 vmail 2>/dev/null || true
+useradd -r -g vmail -u 5000 -d /var/mail/vhosts -m -s /usr/sbin/nologin vmail 2>/dev/null || true
+
+# Garante diretórios e permissões das caixas de e-mail virtuais
+mkdir -p /var/mail/vhosts
+chown -R vmail:vmail /var/mail/vhosts
+chmod -R 770 /var/mail/vhosts
+
+# Adiciona os utilizadores do Postfix e Dovecot ao grupo bcp para que possam ler/escrever a base de dados
+usermod -aG bcp postfix 2>/dev/null || true
+usermod -aG bcp dovecot 2>/dev/null || true
+
+# Ajusta permissões de leitura/escrita do diretório backend e base de dados para o grupo bcp (para suportar WAL)
+chown -R bcp:bcp /opt/bestcode-cp/backend
+chmod 770 /opt/bestcode-cp/backend
+chmod 660 /opt/bestcode-cp/backend/database.db 2>/dev/null || true
+chmod 660 /opt/bestcode-cp/backend/database.db-wal 2>/dev/null || true
+chmod 660 /opt/bestcode-cp/backend/database.db-shm 2>/dev/null || true
+
 # Configura o Postfix para ler os domínios virtuais do SQLite
 cat <<EOF > /etc/postfix/sqlite-virtual-mailbox-domains.cf
 dbpath = /opt/bestcode-cp/backend/database.db
@@ -365,10 +385,14 @@ dbpath = /opt/bestcode-cp/backend/database.db
 query = SELECT 1 FROM emails WHERE email_address='%s'
 EOF
 
-# Aplica parâmetros essenciais no /etc/postfix/main.cf
+# Aplica parâmetros essenciais no /etc/postfix/main.cf (inclui SASL Auth via Dovecot e LMTP)
 postconf -e "virtual_mailbox_domains = sqlite:/etc/postfix/sqlite-virtual-mailbox-domains.cf"
 postconf -e "virtual_mailbox_maps = sqlite:/etc/postfix/sqlite-virtual-mailbox-maps.cf"
 postconf -e "virtual_transport = lmtp:unix:private/dovecot-lmtp"
+postconf -e "smtpd_sasl_type = dovecot"
+postconf -e "smtpd_sasl_path = private/auth"
+postconf -e "smtpd_sasl_auth_enable = yes"
+postconf -e "smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination"
 
 # Configura o Dovecot para autenticar com base no banco do BestCode CP
 cat <<EOF > /etc/dovecot/dovecot-sqlite.conf.ext
@@ -376,12 +400,12 @@ driver = sqlite
 connect = /opt/bestcode-cp/backend/database.db
 default_pass_scheme = BLF-CRYPT
 password_query = SELECT email_address as user, password FROM emails WHERE email_address='%u'
-user_query = SELECT '/var/mail/vhosts/'||domain||'/'||email_address as home, 5000 as uid, 5000 as gid FROM emails WHERE email_address='%u'
+user_query = SELECT '/var/mail/vhosts/'||domain||'/'||email_address as home, 'maildir:/var/mail/vhosts/'||domain||'/'||email_address||'/Maildir' as mail, 5000 as uid, 5000 as gid FROM emails WHERE email_address='%u'
 EOF
 
 # Habilita o SQLite nas configurações de autenticação do Dovecot
-sed -i 's/#!include auth-sql.conf.ext/!include auth-sql.conf.ext/' /etc/dovecot/conf.d/10-auth.conf
-sed -i 's/!include auth-system.conf.ext/#!include auth-system.conf.ext/' /etc/dovecot/conf.d/10-auth.conf
+sed -i 's/#!include auth-sql.conf.ext/!include auth-sql.conf.ext/' /etc/dovecot/conf.d/10-auth.conf 2>/dev/null || true
+sed -i 's/!include auth-system.conf.ext/#!include auth-system.conf.ext/' /etc/dovecot/conf.d/10-auth.conf 2>/dev/null || true
 
 cat <<EOF > /etc/dovecot/conf.d/auth-sql.conf.ext
 passdb {
@@ -391,6 +415,51 @@ passdb {
 userdb {
   driver = sql
   args = /etc/dovecot/dovecot-sqlite.conf.ext
+}
+EOF
+
+# Cria arquivo de configuração personalizada para LMTP, SASL e Pastas Automáticas do Dovecot
+cat <<EOF > /etc/dovecot/conf.d/99-bcp-mail.conf
+# Configurações do BCP para LMTP, Autenticação SASL e Pastas de E-mail
+
+service lmtp {
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    mode = 0660
+    group = postfix
+    user = postfix
+  }
+}
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    mode = 0660
+    group = postfix
+    user = postfix
+  }
+}
+
+namespace inbox {
+  inbox = yes
+  
+  mailbox Drafts {
+    special_use = \\Drafts
+    auto = subscribe
+  }
+  mailbox Junk {
+    special_use = \\Junk
+    auto = subscribe
+  }
+  mailbox Trash {
+    special_use = \\Trash
+    auto = subscribe
+  }
+  mailbox Sent {
+    special_use = \\Sent
+    auto = subscribe
+  }
+  mailbox "Sent Messages" {
+    special_use = \\Sent
+  }
 }
 EOF
 

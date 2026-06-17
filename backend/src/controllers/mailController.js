@@ -129,12 +129,21 @@ async function getEmailDnsRecords(req, res) {
       }
     }
 
+    // Resolve o IP público da VPS para mostrar nos registros DNS recomendados
+    let serverIp = 'IP_DO_SEU_SERVIDOR';
+    try {
+      const { stdout } = await execCommand("curl -s --max-time 2 https://ipify.org || curl -s --max-time 2 https://ifconfig.me || hostname -I | awk '{print $1}'");
+      if (stdout && stdout.trim()) {
+        serverIp = stdout.trim();
+      }
+    } catch (ipErr) {}
+
     res.json({
       domain,
       records: [
         { type: 'MX', name: '@', value: `mail.${domain}`, priority: 10, description: 'Servidor de E-mail de Entrada' },
-        { type: 'A', name: `mail`, value: 'IP_DO_SEU_SERVIDOR', priority: null, description: 'Apontamento do servidor de e-mail' },
-        { type: 'TXT', name: '@', value: 'v=spf1 mx ip4:IP_DO_SEU_SERVIDOR ~all', priority: null, description: 'Registro SPF (Validação de remetente)' },
+        { type: 'A', name: `mail`, value: serverIp, priority: null, description: 'Apontamento do servidor de e-mail' },
+        { type: 'TXT', name: '@', value: `v=spf1 mx ip4:${serverIp} ~all`, priority: null, description: 'Registro SPF (Validação de remetente)' },
         { type: 'TXT', name: 'default._domainkey', value: dkimTxt, priority: null, description: 'Assinatura DKIM (Evita falsificação)' },
         { type: 'TXT', name: '_dmarc', value: 'v=DMARC1; p=none; rua=mailto:postmaster@' + domain, priority: null, description: 'Política DMARC' }
       ]
