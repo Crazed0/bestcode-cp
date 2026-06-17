@@ -157,7 +157,7 @@ try {
     db.prepare("INSERT INTO users (username, password, role) VALUES ('root', ?, 'admin')").run(hashedPassword);
 
     // Salva as credenciais em um arquivo local para o instalador ler e exibir
-    const bootInfoPath = path.resolve(__dirname, '../../first-boot.txt');
+    const bootInfoPath = path.resolve(__dirname, '../../../first-boot.txt');
     fs.writeFileSync(bootInfoPath, `USER: root\nPASSWORD: ${randomPass}\n`, 'utf8');
     try {
       fs.chmodSync(bootInfoPath, 0o600);
