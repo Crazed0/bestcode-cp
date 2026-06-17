@@ -526,6 +526,7 @@ fi
 echo -e "${YELLOW}[9/9] Configurando Segurança e Firewall (UFW)...${NC}"
 ufw default deny incoming
 ufw default allow outgoing
+ufw allow in on lo    # Permitir tráfego na interface local (loopback)
 ufw allow 22/tcp      # SSH
 ufw allow 80/tcp      # HTTP (Nginx/Painel)
 ufw allow 443/tcp     # HTTPS (Nginx/Painel SSL)

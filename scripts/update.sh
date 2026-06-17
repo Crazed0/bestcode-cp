@@ -482,6 +482,15 @@ if [ "$1" = "--nginx-only" ]; then
   exit 0
 fi
 
+# Garante que tráfego na interface local (loopback) é permitido no firewall
+if command -v ufw >/dev/null 2>&1; then
+  if ufw status | grep -q "Status: active"; then
+    echo "Garantindo regra de loopback no firewall (UFW)..."
+    ufw allow in on lo >/dev/null 2>&1 || true
+    ufw reload >/dev/null 2>&1 || true
+  fi
+fi
+
 echo "Reiniciando serviços do painel..."
 if systemctl list-units --type=service | grep -q "bestcode-cp.service"; then
   echo "Reiniciando serviços via Systemd..."
