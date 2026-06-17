@@ -1403,20 +1403,24 @@
   <div class="modal-overlay" id="modal-change-db-pass">
     <div class="modal-box">
       <div class="modal-header">
-        <h3 class="modal-title">Alterar Senha do Banco de Dados</h3>
+        <h3 class="modal-title">Alterar Credenciais da Base de Dados</h3>
         <button class="modal-close" onclick="closeModal('modal-change-db-pass')">&times;</button>
       </div>
       <form id="change-db-pass-form">
         <input type="hidden" id="change-db-pass-id">
         <div class="modal-body">
           <div class="form-group">
-            <label class="form-label" for="change-db-new-pass">Nova Palavra-passe</label>
-            <input type="password" class="form-input" id="change-db-new-pass" placeholder="Definir nova senha MySQL" required>
+            <label class="form-label" for="change-db-new-pass">Nova Palavra-passe (Opcional)</label>
+            <input type="password" class="form-input" id="change-db-new-pass" placeholder="Deixe em branco para manter a atual">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="change-db-host">Host de Acesso</label>
+            <input type="text" class="form-input" id="change-db-host" placeholder="localhost ou IP remoto ou % para todos" required>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn-secondary" onclick="closeModal('modal-change-db-pass')">Cancelar</button>
-          <button type="submit" class="btn-primary">Alterar Senha</button>
+          <button type="submit" class="btn-primary">Salvar Alterações</button>
         </div>
       </form>
     </div>

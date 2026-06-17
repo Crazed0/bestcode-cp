@@ -4,6 +4,7 @@ let terminalOffset = 0;
 const terminalLimit = 100;
 let terminalHasMore = true;
 let terminalIsLoading = false;
+let activeDatabases = [];
 
 // Modal global functions
 window.openModal = function(id) {
@@ -810,6 +811,7 @@ async function loadDatabases() {
 
   try {
     const databases = await apiGet('/databases');
+    activeDatabases = databases || [];
     if (!databases || databases.length === 0) {
       container.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">Nenhuma base de dados configurada.</td></tr>`;
       return;
@@ -843,8 +845,10 @@ async function loadDatabases() {
 }
 
 window.openChangeDbPassModal = function(id) {
+  const dbRecord = activeDatabases.find(d => d.id === id);
   document.getElementById('change-db-pass-id').value = id;
   document.getElementById('change-db-new-pass').value = '';
+  document.getElementById('change-db-host').value = dbRecord ? (dbRecord.db_host || 'localhost') : 'localhost';
   openModal('modal-change-db-pass');
 };
 
@@ -1218,14 +1222,16 @@ function setupForms() {
     e.preventDefault();
     const id = document.getElementById('change-db-pass-id').value;
     const newPass = document.getElementById('change-db-new-pass').value;
+    const newHost = document.getElementById('change-db-host').value;
 
     try {
-      showToast('A alterar a palavra-passe da base de dados...', 'info');
-      const data = await apiPost('/databases/change-password', { id, newPass });
+      showToast('A alterar as credenciais da base de dados...', 'info');
+      const data = await apiPost('/databases/change-password', { id, newPass, newHost });
       if (data) {
         showToast(data.message, 'success');
         closeModal('modal-change-db-pass');
         document.getElementById('change-db-pass-form').reset();
+        loadDatabases();
       }
     } catch (err) {}
   });

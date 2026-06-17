@@ -167,10 +167,10 @@ async function generateSsoToken(req, res) {
  * Alterar a senha de um usuário de banco de dados
  */
 async function changeDatabasePassword(req, res) {
-  const { id, newPass } = req.body;
+  const { id, newPass, newHost } = req.body;
 
-  if (!id || !newPass) {
-    return res.status(400).json({ error: 'ID do banco e nova senha são obrigatórios.' });
+  if (!id) {
+    return res.status(400).json({ error: 'ID do banco é obrigatório.' });
   }
 
   try {
@@ -179,27 +179,50 @@ async function changeDatabasePassword(req, res) {
       return res.status(404).json({ error: 'Banco de dados não encontrado.' });
     }
 
-    const { db_user, db_host } = dbRecord;
-    const dbHost = db_host || 'localhost';
+    const { db_name, db_user, db_pass, db_host } = dbRecord;
+    const oldHost = db_host || 'localhost';
+    const finalPass = newPass || db_pass;
+    const finalHost = (newHost !== undefined) ? newHost.trim().replace(/[^a-zA-Z0-9_\.%\-]/g, '') : oldHost;
 
-    // 1. Atualizar a senha no MySQL do sistema
-    let sqlCommands = `
-      ALTER USER '${db_user}'@'${dbHost}' IDENTIFIED BY '${newPass}';
-    `;
-    if (dbHost !== 'localhost' && dbHost !== '127.0.0.1') {
+    if (!finalHost) {
+      return res.status(400).json({ error: 'Host de acesso inválido.' });
+    }
+
+    let sqlCommands = '';
+
+    // Se o host de acesso mudou, gerenciamos o antigo e o novo
+    if (finalHost !== oldHost) {
+      if (oldHost !== 'localhost' && oldHost !== '127.0.0.1') {
+        sqlCommands += `DROP USER IF EXISTS '${db_user}'@'${oldHost}';\n`;
+      }
+      
       sqlCommands += `
-        ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${newPass}';
+        CREATE USER IF NOT EXISTS '${db_user}'@'${finalHost}' IDENTIFIED BY '${finalPass}';
+        GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'${finalHost}';
+        ALTER USER '${db_user}'@'${finalHost}' IDENTIFIED BY '${finalPass}';
+      `;
+    } else {
+      sqlCommands += `
+        ALTER USER '${db_user}'@'${finalHost}' IDENTIFIED BY '${finalPass}';
       `;
     }
+
+    // Garante sempre acesso localhost (para scripts locais e SSO phpMyAdmin)
+    sqlCommands += `
+      CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${finalPass}';
+      GRANT ALL PRIVILEGES ON \`${db_name}\`.* TO '${db_user}'@'localhost';
+      ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${finalPass}';
+    `;
+
     sqlCommands += `\nFLUSH PRIVILEGES;`;
     await runMysqlQuery(sqlCommands);
 
     // 2. Atualizar no SQLite
-    db.prepare('UPDATE databases SET db_pass = ? WHERE id = ?').run(newPass, id);
+    db.prepare('UPDATE databases SET db_pass = ?, db_host = ? WHERE id = ?').run(finalPass, finalHost, id);
 
-    res.json({ message: 'Senha do banco de dados alterada com sucesso!' });
+    res.json({ message: 'Credenciais da base de dados atualizadas com sucesso!' });
   } catch (error) {
-    res.status(500).json({ error: 'Erro ao alterar a senha: ' + error.message });
+    res.status(500).json({ error: 'Erro ao atualizar as credenciais: ' + error.message });
   }
 }
 
