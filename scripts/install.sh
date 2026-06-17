@@ -293,10 +293,25 @@ WorkingDirectory=/opt/bestcode-cp/backend
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
 Environment=NODE_ENV=production PORT=3000 JWT_SECRET=$(openssl rand -base64 32) PMA_PATH=${PMA_PATH}
+# Ficheiro de overrides por instalação (opcional). Permite definir, p.ex.,
+# GOOGLE_CLIENT_ID=... sem editar este unit. O '-' torna-o opcional.
+EnvironmentFile=-/opt/bestcode-cp/backend/bcp.env
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# Cria um template de overrides por instalação, se ainda não existir
+if [ ! -f /opt/bestcode-cp/backend/bcp.env ]; then
+  cat <<'ENVEOF' > /opt/bestcode-cp/backend/bcp.env
+# Overrides de ambiente do BestCode CP (carregado pelo systemd).
+# Descomenta e define o teu próprio Google OAuth Client ID, registado para o
+# teu domínio na Google Cloud Console (Authorized JavaScript origins).
+# GOOGLE_CLIENT_ID=xxxxxxxx.apps.googleusercontent.com
+ENVEOF
+  chown bcp:bcp /opt/bestcode-cp/backend/bcp.env
+  chmod 640 /opt/bestcode-cp/backend/bcp.env
+fi
 
 cat <<EOF > /etc/systemd/system/bestcode-cp-daemon.service
 [Unit]

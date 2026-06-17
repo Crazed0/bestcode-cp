@@ -8,6 +8,7 @@ const fs = require('fs');
 
 const db = require('../config/db');
 const { authenticateToken, JWT_SECRET } = require('../config/auth');
+const { GOOGLE_CLIENT_ID } = require('../config/google');
 const totp = require('../config/totp');
 const { getIpLocation, parseUserAgent } = require('../utils/geolocation');
 const redisClient = require('../config/redis');
@@ -126,7 +127,7 @@ async function verifyGoogleIdToken(credential) {
       throw new Error("Falha ao validar token com a API do Google: " + errText);
     }
     const payload = await response.json();
-    const clientId = "375047373627-obmrc23n7gvntfm9dreu416rgvs9dj1p.apps.googleusercontent.com";
+    const clientId = GOOGLE_CLIENT_ID;
     if (payload.aud !== clientId) {
       console.warn(`[Google Auth] Audiência incorreta. Esperada: ${clientId}, Recebida: ${payload.aud}`);
       throw new Error("Audiência do token incorreta");
@@ -266,6 +267,12 @@ async function logUserLogin(userId, username, req) {
 // ==========================================
 // ROTAS DE AUTENTICAÇÃO
 // ==========================================
+
+// Configuração pública para a página de login (não requer autenticação).
+// Expõe o Client ID do Google para o frontend inicializar o Google Sign-In.
+router.get('/auth/config', (req, res) => {
+  res.json({ googleClientId: GOOGLE_CLIENT_ID });
+});
 
 // Login no painel
 router.post('/auth/login', (req, res) => {
@@ -962,20 +969,47 @@ router.get('/system/version', authenticateToken, async (req, res) => {
       }
     }
 
+    // Commit local atualmente implantado (o deploy usa git reset --hard origin/main)
+    let localCommit = '';
+    try {
+      localCommit = execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+    } catch (e) {
+      // Ignora falha de git
+    }
+
+    // Commit mais recente no GitHub (branch main). Deteta QUALQUER commit novo,
+    // mesmo que a versão no package.json não tenha sido incrementada.
+    let remoteCommit = '';
+    try {
+      const commitData = await fetchJson(`https://api.github.com/repos/${repoPath}/commits/main`);
+      remoteCommit = (commitData && commitData.sha) ? commitData.sha : '';
+    } catch (e) {
+      console.warn(`[UPDATE CHECK] Falha ao consultar commits do GitHub (${repoPath}):`, e.message);
+    }
+
+    // Versão remota (apenas informativa, best-effort)
     let remoteVersion = localVersion;
-    let updateAvailable = false;
-    
     try {
       const remoteData = await fetchJson(`https://raw.githubusercontent.com/${repoPath}/main/backend/package.json`);
-      remoteVersion = remoteData.version || localVersion;
-      updateAvailable = remoteVersion !== localVersion;
+      if (remoteData && remoteData.version) remoteVersion = remoteData.version;
     } catch (e) {
-      console.warn(`[UPDATE CHECK] Falha ao consultar o GitHub (${repoPath}):`, e.message);
+      // Sem versão remota não é crítico; a deteção baseia-se no commit
+    }
+
+    // Há atualização se tivermos ambos os commits e forem diferentes.
+    // Fallback (sem git/SHA): compara as versões do package.json.
+    let updateAvailable;
+    if (localCommit && remoteCommit) {
+      updateAvailable = localCommit !== remoteCommit;
+    } else {
+      updateAvailable = remoteVersion !== localVersion;
     }
 
     res.json({
       localVersion,
       remoteVersion,
+      localCommit: localCommit ? localCommit.substring(0, 7) : null,
+      remoteCommit: remoteCommit ? remoteCommit.substring(0, 7) : null,
       updateAvailable
     });
   } catch (error) {

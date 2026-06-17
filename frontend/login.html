@@ -308,44 +308,51 @@
       });
     }
 
-    // Carrega o script do Google dinamicamente
-    const googleScriptId = "google-gsi-client";
-    let googleScript = document.getElementById(googleScriptId);
-    if (!googleScript) {
-      googleScript = document.createElement("script");
-      googleScript.id = googleScriptId;
-      googleScript.src = "https://accounts.google.com/gsi/client";
-      googleScript.async = true;
-      googleScript.defer = true;
-      document.body.appendChild(googleScript);
+    // Client ID do Google, obtido do servidor (configurável por instalação via env).
+    // Mantém um fallback caso o endpoint de configuração não responda.
+    let GOOGLE_CLIENT_ID = "375047373627-obmrc23n7gvntfm9dreu416rgvs9dj1p.apps.googleusercontent.com";
+
+    function initGoogleSignIn() {
+      if (!(window.google && window.google.accounts && window.google.accounts.id)) return;
+      google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleGoogleLogin,
+        ux_mode: "popup",
+        context: "signin"
+      });
+      google.accounts.id.renderButton(
+        document.getElementById("google-login-btn-container"),
+        {
+          theme: "outline",
+          size: "large",
+          width: "340",
+          text: "signin_with",
+          shape: "rectangular"
+        }
+      );
     }
 
-    googleScript.onload = () => {
-      if (window.google && window.google.accounts && window.google.accounts.id) {
-        google.accounts.id.initialize({
-          client_id: "375047373627-obmrc23n7gvntfm9dreu416rgvs9dj1p.apps.googleusercontent.com",
-          callback: handleGoogleLogin,
-          ux_mode: "popup",
-          context: "signin"
-        });
-        
-        google.accounts.id.renderButton(
-          document.getElementById("google-login-btn-container"),
-          { 
-            theme: "outline", 
-            size: "large",
-            width: "340",
-            text: "signin_with",
-            shape: "rectangular"
-          }
-        );
-      }
-    };
-
-    // Fallback caso o script já tenha sido carregado antes do onload disparar
-    if (window.google && window.google.accounts && window.google.accounts.id) {
-      googleScript.onload();
-    }
+    // Carrega o client_id configurado no servidor e só depois inicializa o Google Sign-In
+    fetch(API_URL + '/auth/config')
+      .then(r => r.json())
+      .then(cfg => { if (cfg && cfg.googleClientId) GOOGLE_CLIENT_ID = cfg.googleClientId; })
+      .catch(() => {})
+      .finally(() => {
+        const googleScriptId = "google-gsi-client";
+        let googleScript = document.getElementById(googleScriptId);
+        if (!googleScript) {
+          googleScript = document.createElement("script");
+          googleScript.id = googleScriptId;
+          googleScript.src = "https://accounts.google.com/gsi/client";
+          googleScript.async = true;
+          googleScript.defer = true;
+          googleScript.onload = initGoogleSignIn;
+          document.body.appendChild(googleScript);
+        } else {
+          // O script já estava carregado: inicializa diretamente
+          initGoogleSignIn();
+        }
+      });
   </script>
 </body>
 </html>

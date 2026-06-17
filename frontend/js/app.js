@@ -2625,7 +2625,11 @@ window.checkPanelVersion = async function() {
       
       const role = localStorage.getItem('bcp_role');
       if (data.updateAvailable && role === 'admin') {
-        versionEl.innerHTML = `v${data.localVersion} <span style="color: var(--color-danger); font-size: 10px; margin-left: 6px;">(Nova: v${data.remoteVersion})</span>`;
+        // Se a versão mudou mostra a nova; caso contrário indica que há commits novos
+        const novoLabel = (data.remoteVersion && data.remoteVersion !== data.localVersion)
+          ? `Nova: v${data.remoteVersion}`
+          : `Atualização disponível${data.remoteCommit ? ' (' + data.remoteCommit + ')' : ''}`;
+        versionEl.innerHTML = `v${data.localVersion} <span style="color: var(--color-danger); font-size: 10px; margin-left: 6px;">(${novoLabel})</span>`;
         if (updateBtn) updateBtn.style.display = 'inline-flex';
       } else {
         if (updateBtn) updateBtn.style.display = 'none';
