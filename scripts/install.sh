@@ -265,14 +265,14 @@ server {
         proxy_cache_bypass \$http_upgrade;
     }
 
+    # Redireciona acessos diretos a .html no browser para URL limpa (evita loop interno)
+    if (\$request_uri ~* "/login\.html") {
+        return 301 /login;
+    }
+
     # Clean login path
     location = /login {
         try_files /login.html =404;
-    }
-
-    # Redirect direct .html requests to clean path
-    location = /login.html {
-        return 301 /login;
     }
 
     # Tratamento para SPA (redireciona rotas para o index.html)

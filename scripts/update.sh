@@ -61,16 +61,69 @@ if [ -d /usr/share/phpmyadmin ] && [ -f /opt/bestcode-cp/scripts/phpmyadmin-sign
   chmod 644 /usr/share/phpmyadmin/signon.php
 fi
 
-# Corrige instalações antigas: adiciona a rota limpa /login ao Nginx do painel se faltar
-# (evita o ciclo de redireccionamento infinito / flicker na página de login)
+# Corrige e atualiza a configuração do Nginx do painel com cabeçalhos de segurança e sem loops
 PANEL_NGINX="/etc/nginx/sites-available/bestcode-cp"
-if [ -f "$PANEL_NGINX" ] && ! grep -q "location = /login" "$PANEL_NGINX"; then
-  echo "Aplicando correção da rota /login no Nginx do painel..."
-  sed -i '/location \/ {/i\    # Clean login path\n    location = /login {\n        try_files /login.html =404;\n    }\n    location = /login.html {\n        return 301 /login;\n    }\n' "$PANEL_NGINX"
+if [ -f "$PANEL_NGINX" ]; then
+  echo "Atualizando a configuração do Nginx do painel com cabeçalhos de segurança e correção de redirect loop..."
+  
+  # Extrai o domínio atual configurado no Nginx
+  CURRENT_DOMAIN=$(grep -E "server_name" "$PANEL_NGINX" | head -n 1 | awk '{print $2}' | tr -d ';')
+  if [ -z "$CURRENT_DOMAIN" ]; then
+    CURRENT_DOMAIN="_"
+  fi
+  
+  cat <<EOF > "$PANEL_NGINX"
+server {
+    listen 80;
+    server_name $CURRENT_DOMAIN;
+
+    # Oculta versão do Nginx nos cabeçalhos de resposta
+    server_tokens off;
+
+    # Cabeçalhos de Segurança (Security Headers)
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ws: wss: https://api.github.com https://raw.githubusercontent.com; frame-src https://accounts.google.com;" always;
+
+    root /opt/bestcode-cp/frontend;
+    index index.html;
+
+    include snippets/phpmyadmin.conf;
+
+    # Redireciona acessos diretos a .html no browser para URL limpa (evita loop interno)
+    if (\$request_uri ~* "/login\.html") {
+        return 301 /login;
+    }
+
+    # Clean login path
+    location = /login {
+        try_files /login.html =404;
+    }
+
+    # Backend API e WebSocket Proxy
+    location /api {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+    }
+
+    # Tratamento para SPA (redireciona rotas para o index.html)
+    location / {
+        try_files \$uri \$uri/ /index.html;
+    }
+}
+EOF
+
   if nginx -t; then
     systemctl reload nginx
+    echo "Nginx recarregado com sucesso."
   else
-    echo "[AVISO] nginx -t falhou após a correção do /login. Verifica $PANEL_NGINX manualmente."
+    echo "[AVISO] Configuração do Nginx gerada em $PANEL_NGINX é inválida. Por favor, reveja."
   fi
 fi
 
