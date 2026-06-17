@@ -325,6 +325,12 @@ h1, h2, h3, h4, h5, h6 {
   gap: 24px;
 }
 
+#tab-files.active,
+#tab-game-console.active,
+#tab-site-console.active {
+  gap: 0;
+}
+
 /* Cards Premium (Glassmorphism) */
 .glass-card {
   background: var(--bg-panel);
