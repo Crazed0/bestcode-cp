@@ -315,7 +315,10 @@ window.handleRouting = function() {
   updateConsoleTabState();
 };
 
+window.modulesPreloaded = false;
 async function preloadAllModules() {
+  if (window.modulesPreloaded) return;
+  window.modulesPreloaded = true;
   console.log('[BCP] A iniciar pré-carregamento dos módulos em segundo plano...');
   
   // 1. Segunda coisa a carregar: Consola Terminal
