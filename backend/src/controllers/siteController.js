@@ -198,44 +198,44 @@ async function createSite(req, res) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>React SPA | ${domain}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- React & ReactDOM via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel para compilar JSX no browser (ideal para templates simples) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
-        :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(17, 24, 39, 0.8);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --accent-blue: #00d2ff;
-            --text-color: #f8fafc;
-            --text-muted: #94a3b8;
-        }
-        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); font-family: 'Outfit', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
-        .glow-circle { position: absolute; width: 450px; height: 450px; background: radial-gradient(circle, rgba(0, 210, 255, 0.08) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; z-index: -1; }
-        .glow-1 { top: -100px; left: -100px; }
-        .glow-2 { bottom: -100px; right: -100px; }
-        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; padding: 45px; width: 90%; max-width: 550px; text-align: center; backdrop-filter: blur(16px); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); }
-        .logo-wrapper { display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; border-radius: 20px; background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); color: var(--accent-blue); font-size: 32px; font-weight: 800; margin-bottom: 25px; box-shadow: 0 0 20px rgba(0, 210, 255, 0.15); }
-        h1 { font-size: 2.2rem; margin: 0 0 10px 0; font-weight: 800; background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .domain { font-family: 'JetBrains Mono', monospace; color: var(--accent-blue); font-size: 1.1rem; margin-bottom: 20px; }
-        p { color: var(--text-muted); font-size: 1.05rem; line-height: 1.6; margin: 0 0 30px 0; }
-        .badge { display: inline-block; padding: 6px 16px; border-radius: 30px; font-size: 0.85rem; font-weight: 600; background: rgba(0, 229, 255, 0.1); color: #00e5ff; border: 1px solid rgba(0, 229, 255, 0.2); margin-bottom: 30px; }
-        .footer { border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 0.85rem; color: var(--text-muted); }
+        body { background: #0b0f19; color: #f8fafc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 40px; text-align: center; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { color: #00d2ff; margin-bottom: 10px; }
+        p { color: #94a3b8; line-height: 1.6; }
+        button { background: #00d2ff; color: #0b0f19; border: none; padding: 10px 20px; border-radius: 6px; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        button:hover { background: #00b4db; }
     </style>
 </head>
 <body>
-    <div class="glow-circle glow-1"></div>
-    <div class="glow-circle glow-2"></div>
-    <div id="root"></div>
-    <script>
-        document.getElementById('root').innerHTML = \`
-            <div class="card">
-                <div class="logo-wrapper">RE</div>
-                <h1>React SPA Online!</h1>
-                <div class="domain">${domain}</div>
-                <p>Esta é uma página SPA base. O Nginx está devidamente configurado com try_files para suporte a roteamento dinâmico React Router.</p>
-                <span class="badge">React Single Page App</span>
-                <div class="footer">Desenvolvido por BestCode &bull; Servido via Nginx</div>
-            </div>
-        \`;
+    <div id="root">Carregando aplicação React...</div>
+
+    <!-- Script com type="text/babel" para suportar JSX -->
+    <script type="text/babel">
+        function App() {
+            const [clicks, setClicks] = React.useState(0);
+
+            return (
+                <div className="card">
+                    <h1>React SPA Online! ⚛️</h1>
+                    <p>Esta é uma aplicação real escrita em <strong>React (com JSX compilado no browser)</strong>.</p>
+                    <p>Ficheiro: <code>/var/www/${domain}/index.html</code></p>
+                    <div>
+                        <button onClick={() => setClicks(clicks + 1)}>
+                            Clicaste {clicks} vezes
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
     </script>
 </body>
 </html>`;
@@ -247,39 +247,18 @@ async function createSite(req, res) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Site Estático | ${domain}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(17, 24, 39, 0.8);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --accent-blue: #00d2ff;
-            --text-color: #f8fafc;
-            --text-muted: #94a3b8;
-        }
-        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); font-family: 'Outfit', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
-        .glow-circle { position: absolute; width: 450px; height: 450px; background: radial-gradient(circle, rgba(0, 210, 255, 0.08) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; z-index: -1; }
-        .glow-1 { top: -100px; left: -100px; }
-        .glow-2 { bottom: -100px; right: -100px; }
-        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; padding: 45px; width: 90%; max-width: 550px; text-align: center; backdrop-filter: blur(16px); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); }
-        .logo-wrapper { display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; border-radius: 20px; background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); color: var(--accent-blue); font-size: 32px; font-weight: 800; margin-bottom: 25px; box-shadow: 0 0 20px rgba(0, 210, 255, 0.15); }
-        h1 { font-size: 2.2rem; margin: 0 0 10px 0; font-weight: 800; background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .domain { font-family: 'JetBrains Mono', monospace; color: var(--accent-blue); font-size: 1.1rem; margin-bottom: 20px; }
-        p { color: var(--text-muted); font-size: 1.05rem; line-height: 1.6; margin: 0 0 30px 0; }
-        .badge { display: inline-block; padding: 6px 16px; border-radius: 30px; font-size: 0.85rem; font-weight: 600; background: rgba(255, 255, 255, 0.05); color: var(--text-muted); border: 1px solid rgba(255, 255, 255, 0.1); margin-bottom: 30px; }
-        .footer { border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 0.85rem; color: var(--text-muted); }
+        body { background: #0b0f19; color: #f8fafc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 40px; text-align: center; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { color: #00d2ff; margin-bottom: 10px; }
+        p { color: #94a3b8; line-height: 1.6; }
     </style>
 </head>
 <body>
-    <div class="glow-circle glow-1"></div>
-    <div class="glow-circle glow-2"></div>
     <div class="card">
-        <div class="logo-wrapper">ST</div>
         <h1>Website Estático Online!</h1>
-        <div class="domain">${domain}</div>
-        <p>Este website foi criado com sucesso no painel **BestCode Control Panel (BCP)** e está pronto para o teu código.</p>
-        <span class="badge">Static Application</span>
-        <div class="footer">Desenvolvido por BestCode &bull; Servido via Nginx</div>
+        <p>O teu site estático HTML/CSS foi criado com sucesso.</p>
+        <p>Podes editar este ficheiro em: <code>/var/www/${domain}/index.html</code></p>
     </div>
 </body>
 </html>`;
@@ -303,41 +282,19 @@ def hello():
 <html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Python Flask App | BestCode CP</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <title>Python Flask App</title>
     <style>
-        :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(17, 24, 39, 0.8);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --accent-blue: #00d2ff;
-            --text-color: #f8fafc;
-            --text-muted: #94a3b8;
-        }
-        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); font-family: 'Outfit', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
-        .glow-circle { position: absolute; width: 450px; height: 450px; background: radial-gradient(circle, rgba(0, 210, 255, 0.08) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; z-index: -1; }
-        .glow-1 { top: -100px; left: -100px; }
-        .glow-2 { bottom: -100px; right: -100px; }
-        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; padding: 45px; width: 90%; max-width: 550px; text-align: center; backdrop-filter: blur(16px); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); }
-        .logo-wrapper { display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; border-radius: 20px; background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); color: var(--accent-blue); font-size: 32px; font-weight: 800; margin-bottom: 25px; box-shadow: 0 0 20px rgba(0, 210, 255, 0.15); }
-        h1 { font-size: 2.2rem; margin: 0 0 10px 0; font-weight: 800; background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .domain { font-family: 'JetBrains Mono', monospace; color: var(--accent-blue); font-size: 1.1rem; margin-bottom: 20px; }
-        p { color: var(--text-muted); font-size: 1.05rem; line-height: 1.6; margin: 0 0 30px 0; }
-        .badge { display: inline-block; padding: 6px 16px; border-radius: 30px; font-size: 0.85rem; font-weight: 600; background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.25); margin-bottom: 30px; }
-        .footer { border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 0.85rem; color: var(--text-muted); }
+        body { background: #0b0f19; color: #f8fafc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 40px; text-align: center; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { color: #3b82f6; margin-bottom: 10px; }
+        p { color: #94a3b8; line-height: 1.6; }
     </style>
 </head>
 <body>
-    <div class="glow-circle glow-1"></div>
-    <div class="glow-circle glow-2"></div>
     <div class="card">
-        <div class="logo-wrapper">PY</div>
-        <h1>Python App Online!</h1>
-        <div class="domain">${domain}</div>
-        <p>A tua aplicação Flask está ativa e a correr no ambiente virtual gerido pelo **BestCode CP**.</p>
-        <span class="badge">Python Flask Application</span>
-        <div class="footer">Desenvolvido por BestCode &bull; Servido via PM2 + Nginx Proxy</div>
+        <h1>Python Flask Online! 🐍</h1>
+        <p>A tua aplicação Python está ativa sob ambiente virtual gerido pelo PM2.</p>
+        <p>Podes editar este ficheiro em: <code>app.py</code></p>
     </div>
 </body>
 </html>"""
@@ -399,47 +356,27 @@ if __name__ == "__main__":
       }
     } else { // PHP
       const indexContent = `<?php
-// Template PHP inicial
+// BestCode CP - Template de Início PHP
+$domainName = $_SERVER['HTTP_HOST'] ?? '${domain}';
 ?>
 <!DOCTYPE html>
 <html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PHP Website | ${domain}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <title>PHP Website | <?php echo htmlspecialchars($domainName); ?></title>
     <style>
-        :root {
-            --bg-color: #0b0f19;
-            --card-bg: rgba(17, 24, 39, 0.8);
-            --border-color: rgba(255, 255, 255, 0.08);
-            --accent-blue: #00d2ff;
-            --text-color: #f8fafc;
-            --text-muted: #94a3b8;
-        }
-        body { margin: 0; padding: 0; background-color: var(--bg-color); color: var(--text-color); font-family: 'Outfit', sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; overflow: hidden; }
-        .glow-circle { position: absolute; width: 450px; height: 450px; background: radial-gradient(circle, rgba(0, 210, 255, 0.08) 0%, rgba(0,0,0,0) 70%); border-radius: 50%; z-index: -1; }
-        .glow-1 { top: -100px; left: -100px; }
-        .glow-2 { bottom: -100px; right: -100px; }
-        .card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 20px; padding: 45px; width: 90%; max-width: 550px; text-align: center; backdrop-filter: blur(16px); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5); }
-        .logo-wrapper { display: inline-flex; align-items: center; justify-content: center; width: 80px; height: 80px; border-radius: 20px; background: rgba(0, 210, 255, 0.05); border: 1px solid rgba(0, 210, 255, 0.2); color: var(--accent-blue); font-size: 32px; font-weight: 800; margin-bottom: 25px; box-shadow: 0 0 20px rgba(0, 210, 255, 0.15); }
-        h1 { font-size: 2.2rem; margin: 0 0 10px 0; font-weight: 800; background: linear-gradient(135deg, #ffffff 30%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .domain { font-family: 'JetBrains Mono', monospace; color: var(--accent-blue); font-size: 1.1rem; margin-bottom: 20px; }
-        p { color: var(--text-muted); font-size: 1.05rem; line-height: 1.6; margin: 0 0 30px 0; }
-        .badge { display: inline-block; padding: 6px 16px; border-radius: 30px; font-size: 0.85rem; font-weight: 600; background: rgba(168, 85, 247, 0.1); color: #a855f7; border: 1px solid rgba(168, 85, 247, 0.2); margin-bottom: 30px; }
-        .footer { border-top: 1px solid var(--border-color); padding-top: 20px; font-size: 0.85rem; color: var(--text-muted); }
+        body { background: #0b0f19; color: #f8fafc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .card { background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 40px; text-align: center; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h1 { color: #00d2ff; margin-bottom: 10px; }
+        p { color: #94a3b8; line-height: 1.6; }
     </style>
 </head>
 <body>
-    <div class="glow-circle glow-1"></div>
-    <div class="glow-circle glow-2"></div>
     <div class="card">
-        <div class="logo-wrapper">PH</div>
         <h1>Website PHP Online!</h1>
-        <div class="domain">${domain}</div>
-        <p>O teu website PHP está ativo com versão ${phpVersion || '8.2'} executando de forma otimizada via PHP-FPM.</p>
-        <span class="badge">PHP Application</span>
-        <div class="footer">Desenvolvido por BestCode &bull; Servido via Nginx</div>
+        <p>O teu website PHP está ativo com versão <strong>PHP <?php echo phpversion(); ?></strong> executando via PHP-FPM.</p>
+        <p>Podes editar este ficheiro em: <code>/var/www/<?php echo htmlspecialchars($domainName); ?>/index.php</code></p>
     </div>
 </body>
 </html>`;
