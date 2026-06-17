@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Acesso | BestCode CP</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Estilos extras Obsidian/Charcoal para Login */
+    body {
+      background-color: #0b0c0f !important;
+      overflow: hidden;
+    }
+    .login-card {
+      border: 1px solid rgba(255, 255, 255, 0.08) !important;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(255, 255, 255, 0.03) !important;
+      background: rgba(18, 19, 23, 0.95) !important; /* Charcoal Dark Gray */
+      padding: 30px;
+    }
+    .login-logo img {
+      max-width: 220px;
+      height: auto;
+      margin-bottom: 12px;
+      filter: drop-shadow(0 0 8px rgba(255, 255, 255, 0.35));
+    }
+    .form-input {
+      border: 1px solid rgba(255, 255, 255, 0.1) !important;
+      background-color: rgba(255, 255, 255, 0.02) !important;
+      color: #ffffff !important;
+      font-family: var(--font-mono) !important;
+    }
+    .form-input::placeholder {
+      color: rgba(255, 255, 255, 0.3) !important;
+    }
+    .form-input:focus {
+      border-color: rgba(255, 255, 255, 0.25) !important;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.05) !important;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)) !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      color: #ffffff !important;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+      transition: all var(--transition-fast) !important;
+    }
+    .btn-primary:hover {
+      background: #ffffff !important;
+      color: #000000 !important;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.4) !important;
+    }
+    .form-group label {
+      color: rgba(255, 255, 255, 0.6) !important;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body class="login-body">
+
+  <!-- Canvas da Chuva de Código Matrix -->
+  <canvas id="matrix-canvas" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: -1; pointer-events: none; opacity: 0.15;"></canvas>
+
+  <div class="login-card glass-card">
+    <div class="login-logo" style="text-align: center; margin-bottom: 24px;">
+      <!-- Logo Oficial da BestCode -->
+      <img src="img/bestcode.png" alt="BestCode Logo">
+      <div style="font-family: var(--font-mono); color: #ffffff; font-size: 14px; font-weight: bold; letter-spacing: 0.1em; margin-top: 6px;">
+        CONTROL PANEL
+      </div>
+    <div id="login-header-container" style="display: none; margin-bottom: 24px; text-align: center;">
+      <h2 id="login-title" style="color: #ffffff; font-size: 18px; text-transform: uppercase;"></h2>
+      <p id="login-desc" style="color: rgba(255, 255, 255, 0.5); font-size: 12px;"></p>
+    </div>
+
+    <!-- Login Form -->
+    <form id="login-form">
+      <!-- Container das credenciais normais (escondido durante verificação de 2FA) -->
+      <div id="credentials-fields">
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label" for="username">Utilizador</label>
+          <input class="form-input" type="text" id="username" placeholder="ex: root" required>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 24px;">
+          <label class="form-label" for="password">Palavra-passe</label>
+          <input class="form-input" type="password" id="password" placeholder="••••••••" required>
+        </div>
+      </div>
+
+      <!-- Container do Google Authenticator (escondido por padrão) -->
+      <div id="2fa-field" style="display: none; margin-bottom: 24px;">
+        <div class="form-group">
+          <label class="form-label" for="2fa-code" style="color: #ffb700 !important;">Código Google Authenticator (2FA)</label>
+          <input class="form-input" type="text" id="2fa-code" placeholder="000000" maxlength="6" pattern="[0-9]*" inputmode="numeric">
+          <small style="color: rgba(255, 255, 255, 0.4); font-size: 11px; margin-top: 6px; display: block;">Introduza o código de 6 dígitos gerado na aplicação.</small>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; height: 44px;" id="submit-btn">
+        Iniciar sessão
+      </button>
+    </form>
+
+    <!-- Google Login Button -->
+    <div style="display: flex; align-items: center; justify-content: center; margin-top: 16px; position: relative;">
+      <div style="flex-grow: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
+      <span style="padding: 0 10px; font-size: 10px; color: rgba(255,255,255,0.3); text-transform: uppercase; font-family: var(--font-mono);">ou aceder com</span>
+      <div style="flex-grow: 1; height: 1px; background: rgba(255,255,255,0.08);"></div>
+    </div>
+    
+    <div id="google-login-btn-container" style="display: flex; justify-content: center; margin-top: 16px; min-height: 44px; width: 100%;"></div>
+
+    <div class="login-footer" style="margin-top: 24px; text-align: center; font-size: 10px; color: rgba(255, 255, 255, 0.3); font-family: var(--font-mono);">
+      SECURE PROTOCOL BCP // &copy; 2026 BESTCODE
+    </div>
+  </div>
+
+  <div id="toast-container"></div>
+
+  <!-- Script da Chuva de Código Matrix -->
+  <script>
+    const canvas = document.getElementById('matrix-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    
+    const chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄ";
+    const alphabet = chars.split("");
+    const fontSize = 14;
+    const columns = Math.floor(canvas.width / fontSize) + 1;
+    const rainDrops = Array.from({ length: columns }).map(() => Math.floor(Math.random() * (canvas.height / fontSize)));
+    
+    function draw() {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.font = fontSize + 'px monospace';
+      
+      for (let i = 0; i < rainDrops.length; i++) {
+        const text = alphabet[Math.floor(Math.random() * alphabet.length)];
+        ctx.fillText(text, i * fontSize, rainDrops[i] * fontSize);
+        
+        if (rainDrops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+          rainDrops[i] = 0;
+        }
+        rainDrops[i]++;
+      }
+    }
+    // Pré-visualização com rastros gerados de imediato
+    for (let f = 0; f < 100; f++) {
+      draw();
+    }
+    setInterval(draw, 33);
+  </script>
+
+  <!-- Lógica de autenticação e 2FA -->
+  <script>
+    const API_URL = window.location.origin + '/api';
+    
+    const loginForm = document.getElementById('login-form');
+    const loginTitle = document.getElementById('login-title');
+    const loginDesc = document.getElementById('login-desc');
+    const submitBtn = document.getElementById('submit-btn');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    
+    const credentialsFields = document.getElementById('credentials-fields');
+    const faField = document.getElementById('2fa-field');
+    const faInput = document.getElementById('2fa-code');
+
+    let temp2faToken = ''; // Guarda o token JWT temporário para a segunda etapa do login
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.innerText = message;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    loginForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      // Fluxo 2: Verificação do Código 2FA
+      if (temp2faToken) {
+        const code = faInput.value.trim();
+        if (!code || code.length !== 6) {
+          showToast("Insira o código de 6 dígitos.", "error");
+          return;
+        }
+
+        try {
+          const response = await fetch(API_URL + '/auth/login-2fa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tempToken: temp2faToken, code })
+          });
+
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Erro na verificação do 2FA.');
+
+          saveAuthAndRedirect(data);
+        } catch (err) {
+          showToast(err.message, "error");
+        }
+        return;
+      }
+
+      // Fluxo 1: Login Padrão (Usuário e Senha)
+      const username = usernameInput.value.trim();
+      const password = passwordInput.value;
+
+      try {
+        const response = await fetch(API_URL + '/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Falha no login.');
+
+        // Se o usuário tem 2FA habilitado
+        if (data.need2FA) {
+          temp2faToken = data.tempToken;
+          
+          // Oculta credenciais e exibe campo 2FA
+          credentialsFields.style.display = 'none';
+          faField.style.display = 'block';
+          faInput.setAttribute('required', 'true');
+          faInput.focus();
+
+          loginTitle.innerText = "Verificar Código";
+          loginDesc.innerText = "Insira o código de autenticação de dois fatores.";
+          document.getElementById('login-header-container').style.display = 'block';
+          submitBtn.innerText = "Confirmar Código 2FA";
+          showToast("Código 2FA requerido para este utilizador.", "info");
+        } else {
+          saveAuthAndRedirect(data);
+        }
+      } catch (err) {
+        showToast(err.message, "error");
+      }
+    });
+
+    function saveAuthAndRedirect(data) {
+      localStorage.setItem('bcp_token', data.token);
+      localStorage.setItem('bcp_username', data.username);
+      localStorage.setItem('bcp_role', data.role);
+      window.location.href = '/';
+    }
+
+    // Se já estiver logado, redireciona
+    if (localStorage.getItem('bcp_token')) {
+      window.location.href = '/';
+    }
+
+    // Inicialização do Google Sign-In real
+    function handleGoogleLogin(response) {
+      fetch(API_URL + '/auth/google-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential: response.credential })
+      })
+      .then(res => res.json().then(data => ({ status: res.status, data })))
+      .then(({ status, data }) => {
+        if (status === 200) {
+          if (data.need2FA) {
+            temp2faToken = data.tempToken;
+            credentialsFields.style.display = 'none';
+            faField.style.display = 'block';
+            faInput.setAttribute('required', 'true');
+            faInput.focus();
+            loginTitle.innerText = "Verificar Código";
+            loginDesc.innerText = "Insira o código de autenticação de dois fatores.";
+            document.getElementById('login-header-container').style.display = 'block';
+            submitBtn.innerText = "Confirmar Código 2FA";
+            showToast("Código 2FA requerido para este utilizador.", "info");
+          } else {
+            saveAuthAndRedirect(data);
+          }
+        } else {
+          showToast(data.error || 'Erro na autenticação do Google.', 'error');
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        showToast('Erro ao conectar ao servidor.', 'error');
+      });
+    }
+
+    // Carrega o script do Google dinamicamente
+    const googleScriptId = "google-gsi-client";
+    let googleScript = document.getElementById(googleScriptId);
+    if (!googleScript) {
+      googleScript = document.createElement("script");
+      googleScript.id = googleScriptId;
+      googleScript.src = "https://accounts.google.com/gsi/client";
+      googleScript.async = true;
+      googleScript.defer = true;
+      document.body.appendChild(googleScript);
+    }
+
+    googleScript.onload = () => {
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        google.accounts.id.initialize({
+          client_id: "375047373627-obmrc23n7gvntfm9dreu416rgvs9dj1p.apps.googleusercontent.com",
+          callback: handleGoogleLogin,
+          ux_mode: "popup",
+          context: "signin"
+        });
+        
+        google.accounts.id.renderButton(
+          document.getElementById("google-login-btn-container"),
+          { 
+            theme: "outline", 
+            size: "large",
+            width: "340",
+            text: "signin_with",
+            shape: "rectangular"
+          }
+        );
+      }
+    };
+
+    // Fallback caso o script já tenha sido carregado antes do onload disparar
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      googleScript.onload();
+    }
+  </script>
+</body>
+</html>
