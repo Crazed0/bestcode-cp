@@ -73,10 +73,11 @@ if [ "$1" != "--nginx-only" ]; then
     chmod 644 /usr/share/phpmyadmin/signon.php
   fi
 
-  # Garante pacotes necessários de e-mail (postfix-sqlite)
-  if ! dpkg -s postfix-sqlite >/dev/null 2>&1; then
-    echo "Instalando postfix-sqlite..."
-    apt-get update && apt-get install -y postfix-sqlite || true
+  # Garante pacotes necessários de e-mail e webmail (postfix-sqlite, roundcube)
+  if ! dpkg -s postfix-sqlite >/dev/null 2>&1 || ! dpkg -s roundcube-core >/dev/null 2>&1; then
+    echo "Instalando pacotes de e-mail e Roundcube Webmail..."
+    apt-get update
+    DEBIAN_FRONTEND=noninteractive apt-get install -y postfix-sqlite roundcube roundcube-mysql roundcube-plugins || true
   fi
 
   # Cria o grupo e o utilizador vmail (virtual mail) com UID/GID 5000 se não existirem
@@ -203,7 +204,7 @@ if [ -f "$PANEL_NGINX" ]; then
   
   # Garanta que o snippet do Roundcube existe e está correto
   cat <<EOF > /etc/nginx/snippets/roundcube.conf
-location /webmail {
+location /webmail/ {
     alias /var/lib/roundcube/;
     index index.php index.html index.htm;
     location ~ ^/webmail/(config|temp|logs)/ {
@@ -220,8 +221,11 @@ location /webmail {
         alias /var/lib/roundcube/\$1;
     }
 }
+location /webmail {
+    return 301 /webmail/;
+}
 location /roundcube {
-    return 301 /webmail;
+    return 301 /webmail/;
 }
 EOF
 

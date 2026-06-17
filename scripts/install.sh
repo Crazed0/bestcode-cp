@@ -226,7 +226,7 @@ EOF
 
 # Cria arquivo de bloco de servidor Nginx para o Roundcube Webmail global (/webmail)
 cat <<EOF > /etc/nginx/snippets/roundcube.conf
-location /webmail {
+location /webmail/ {
     alias /var/lib/roundcube/;
     index index.php index.html index.htm;
     location ~ ^/webmail/(config|temp|logs)/ {
@@ -243,8 +243,11 @@ location /webmail {
         alias /var/lib/roundcube/\$1;
     }
 }
+location /webmail {
+    return 301 /webmail/;
+}
 location /roundcube {
-    return 301 /webmail;
+    return 301 /webmail/;
 }
 EOF
 
