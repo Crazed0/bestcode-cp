@@ -702,7 +702,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .form-select {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: #0b0c0f;
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
   padding: 10px 14px;
@@ -716,6 +716,11 @@ h1, h2, h3, h4, h5, h6 {
   background-size: 16px;
   padding-right: 40px;
   transition: var(--transition-fast);
+}
+
+.form-select option {
+  background-color: #0b0c0f;
+  color: var(--text-primary);
 }
 
 .form-select:focus {
