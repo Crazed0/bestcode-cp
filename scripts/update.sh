@@ -100,7 +100,7 @@ if [ "$1" != "--nginx-only" ]; then
   # Configura regras sudoers exclusivas para o utilizador bcp (garante permissões atualizadas)
   echo "Atualizando regras sudoers para o utilizador bcp..."
   cat <<EOF > /etc/sudoers.d/bestcode-cp
-bcp ALL=(ALL) NOPASSWD: /usr/sbin/ufw, /sbin/ufw, /usr/bin/fail2ban-client, /usr/bin/certbot, /usr/bin/systemctl, /bin/systemctl, /usr/sbin/nginx, /usr/bin/mysql, /usr/bin/mariadb, /usr/bin/chown, /bin/chown, /usr/bin/rm, /bin/rm, /usr/bin/crontab, /usr/bin/ln, /bin/ln, /bin/bash, /usr/bin/bash, /usr/bin/pkill, /bin/pkill, /bin/kill, /usr/bin/kill, /opt/bestcode-cp/scripts/update.sh
+bcp ALL=(ALL) NOPASSWD: /usr/sbin/ufw, /sbin/ufw, /usr/bin/fail2ban-client, /usr/bin/certbot, /usr/bin/systemctl, /bin/systemctl, /usr/sbin/nginx, /usr/bin/mysql, /usr/bin/mariadb, /usr/bin/chown, /bin/chown, /usr/bin/rm, /bin/rm, /usr/bin/crontab, /usr/bin/ln, /bin/ln, /bin/bash, /usr/bin/bash, /usr/bin/pkill, /bin/pkill, /bin/kill, /usr/bin/kill, /usr/bin/systemd-run, /bin/systemd-run, /opt/bestcode-cp/scripts/update.sh
 EOF
   chmod 440 /etc/sudoers.d/bestcode-cp
 
@@ -495,16 +495,21 @@ echo "Reiniciando serviços do painel..."
 if systemctl list-units --type=service | grep -q "bestcode-cp.service"; then
   echo "Reiniciando serviços via Systemd..."
   systemctl daemon-reload
-  systemctl restart bestcode-cp
   systemctl restart bestcode-cp-daemon || true
+
+  # Remove o script temporário de stage 2 se aplicável antes de reiniciar o painel
+  if [ "$1" = "--stage2" ]; then
+    rm -f "$0"
+  fi
+
+  echo "Atualização concluída com sucesso! Agendando reinício do painel..."
+  # Executa o restart do painel em unidade transiente do systemd para evitar ser morto pelo cgroup
+  systemd-run --description="BCP Panel Self-Restart" systemctl restart bestcode-cp
 else
   echo "Systemd não encontrado ou serviço inativo. Tentando reiniciar via PM2..."
   pm2 restart all || true
+  if [ "$1" = "--stage2" ]; then
+    rm -f "$0"
+  fi
+  echo "Atualização concluída com sucesso!"
 fi
-
-# Remove o script temporário de stage 2 se aplicável
-if [ "$1" = "--stage2" ]; then
-  rm -f "$0"
-fi
-
-echo "Atualização concluída com sucesso!"
