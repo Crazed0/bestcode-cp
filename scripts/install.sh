@@ -240,6 +240,16 @@ server {
     listen 80;
     server_name _; # Responde a qualquer IP ou domínio apontado
 
+    # Oculta versão do Nginx nos cabeçalhos de resposta
+    server_tokens off;
+
+    # Cabeçalhos de Segurança (Security Headers)
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ws: wss: https://api.github.com https://raw.githubusercontent.com; frame-src https://accounts.google.com;" always;
+
     root /opt/bestcode-cp/frontend;
     index index.html;
 
@@ -428,6 +438,17 @@ chown bcp:bcp /opt/bestcode-cp/first-boot.txt 2>/dev/null || true
 # Salva a chave secreta do Daemon Wings num ficheiro seguro do root
 echo "$DAEMON_SECRET" > /opt/bestcode-cp/daemon-secret.txt
 chmod 600 /opt/bestcode-cp/daemon-secret.txt
+
+# Desativa o Debian Banner no SSH para evitar fuga de informação
+if [ -f /etc/ssh/sshd_config ]; then
+  echo "Desativando o DebianBanner no SSH..."
+  if grep -q "^#DebianBanner" /etc/ssh/sshd_config || grep -q "^DebianBanner" /etc/ssh/sshd_config; then
+    sed -i 's/^#*DebianBanner.*/DebianBanner no/' /etc/ssh/sshd_config
+  else
+    echo "DebianBanner no" >> /etc/ssh/sshd_config
+  fi
+  systemctl restart ssh || systemctl restart sshd || true
+fi
 
 ROOT_PASSWORD="Falha ao carregar senha gerada automaticamente."
 

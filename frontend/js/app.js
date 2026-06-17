@@ -2642,6 +2642,12 @@ window.checkPanelVersion = async function() {
           : `Atualização disponível${data.remoteCommit ? ' (' + data.remoteCommit + ')' : ''}`;
         versionEl.innerHTML = `v${data.localVersion} <span style="color: var(--color-danger); font-size: 10px; margin-left: 6px;">(${novoLabel})</span>`;
         if (updateBtn) updateBtn.style.display = 'inline-flex';
+
+        // Exibe toast informativo uma vez por sessão do browser
+        if (!sessionStorage.getItem('bcp_update_notified')) {
+          showToast('Atualização disponível para o BestCode CP! Vá às Definições ou no rodapé para atualizar.', 'info');
+          sessionStorage.setItem('bcp_update_notified', 'true');
+        }
       } else {
         if (updateBtn) updateBtn.style.display = 'none';
       }

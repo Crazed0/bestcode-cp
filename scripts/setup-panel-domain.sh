@@ -32,6 +32,16 @@ server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
 
+    # Oculta versão do Nginx nos cabeçalhos de resposta
+    server_tokens off;
+
+    # Cabeçalhos de Segurança (Security Headers)
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ws: wss: https://api.github.com https://raw.githubusercontent.com; frame-src https://accounts.google.com;" always;
+
     root /opt/bestcode-cp/frontend;
     index index.html;
 

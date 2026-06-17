@@ -274,8 +274,30 @@ router.get('/auth/config', (req, res) => {
   res.json({ googleClientId: GOOGLE_CLIENT_ID });
 });
 
+// Rate Limiter em memória para prevenção de ataques de brute-force nos endpoints de autenticação
+const rateLimits = new Map();
+function loginRateLimiter(limit = 10, windowMs = 60000) {
+  return (req, res, next) => {
+    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const now = Date.now();
+
+    if (!rateLimits.has(ip)) {
+      rateLimits.set(ip, []);
+    }
+
+    let requests = rateLimits.get(ip).filter(timestamp => now - timestamp < windowMs);
+    if (requests.length >= limit) {
+      return res.status(429).json({ error: 'Muitas tentativas de login de seguida. Por favor, tente novamente após 1 minuto.' });
+    }
+
+    requests.push(now);
+    rateLimits.set(ip, requests);
+    next();
+  };
+}
+
 // Login no painel
-router.post('/auth/login', (req, res) => {
+router.post('/auth/login', loginRateLimiter(10, 60000), (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -285,6 +307,8 @@ router.post('/auth/login', (req, res) => {
   try {
     const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
     if (!user) {
+      // Executa compare fictício para evitar Timing Attacks de enumeração de utilizadores
+      bcrypt.compareSync(password, '$2b$10$dummyhashplaceholderstoreinconfig1234567890123456789012');
       return res.status(401).json({ error: 'Credenciais inválidas.' });
     }
 
@@ -312,7 +336,7 @@ router.post('/auth/login', (req, res) => {
 });
 
 // Login no painel com o Google
-router.post('/auth/google-login', async (req, res) => {
+router.post('/auth/google-login', loginRateLimiter(10, 60000), async (req, res) => {
   const { credential } = req.body;
   if (!credential) {
     console.error('[Google Auth Login] Nenhum credential enviado.');
@@ -357,7 +381,7 @@ router.post('/auth/google-login', async (req, res) => {
 });
 
 // Verificar código 2FA no login
-router.post('/auth/login-2fa', (req, res) => {
+router.post('/auth/login-2fa', loginRateLimiter(10, 60000), (req, res) => {
   const { tempToken, code } = req.body;
 
   if (!tempToken || !code) {
