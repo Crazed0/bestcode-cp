@@ -53,7 +53,7 @@ app.use(pmaPath, (req, res) => {
   req.pipe(proxyReq, { end: true });
 });
 
-// Middleware global
+// Middleware global - Injeta cabeçalhos de segurança (CSP, X-Frame, XSS, nosniff)
 app.use((req, res, next) => {
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-Content-Type-Options', 'nosniff');
