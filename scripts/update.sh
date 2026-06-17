@@ -200,6 +200,36 @@ namespace inbox {
 }
 EOF
 
+  # Configura SMTP e IMAP do Roundcube para usar o Postfix/Dovecot locais
+  if [ -f /etc/roundcube/config.inc.php ]; then
+    echo "Configurando SMTP/IMAP no Roundcube..."
+    # Limpa configurações antigas do BCP se existirem
+    sed -i '/\/\/ BCP Mail Server Integration/Q' /etc/roundcube/config.inc.php
+    
+    cat <<'EOF' >> /etc/roundcube/config.inc.php
+
+// BCP Mail Server Integration
+$config['imap_host'] = '127.0.0.1:143';
+$config['smtp_host'] = '127.0.0.1:25';
+$config['smtp_user'] = '%u';
+$config['smtp_pass'] = '%p';
+$config['imap_conn_options'] = array(
+  'ssl' => array(
+    'verify_peer'       => false,
+    'verify_peer_name'  => false,
+    'allow_self_signed' => true,
+  ),
+);
+$config['smtp_conn_options'] = array(
+  'ssl' => array(
+    'verify_peer'       => false,
+    'verify_peer_name'  => false,
+    'allow_self_signed' => true,
+  ),
+);
+EOF
+  fi
+
   # Reinicia os serviços de e-mail para aplicar as alterações
   systemctl restart postfix dovecot || true
 fi
