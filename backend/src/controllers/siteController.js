@@ -203,6 +203,18 @@ async function createSite(req, res) {
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <!-- Babel para compilar JSX no browser (ideal para templates simples) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script>
+      Babel.registerPreset("custom-react", {
+        presets: [
+          [
+            Babel.availablePresets["react"],
+            {
+              runtime: "classic"
+            }
+          ]
+        ]
+      });
+    </script>
     <style>
         body { background: #0b0f19; color: #f8fafc; font-family: sans-serif; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
         .card { background: rgba(17, 24, 39, 0.8); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 40px; text-align: center; max-width: 500px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
@@ -216,8 +228,7 @@ async function createSite(req, res) {
     <div id="root">Carregando aplicação React...</div>
 
     <!-- Script com type="text/babel" para suportar JSX -->
-    <script type="text/babel">
-        /** @jsxRuntime classic */
+    <script type="text/babel" data-presets="custom-react">
         function App() {
             const [clicks, setClicks] = React.useState(0);
 
