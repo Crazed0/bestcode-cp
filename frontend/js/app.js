@@ -2056,6 +2056,8 @@ window.loadUserProfile = async function() {
     }
   } catch (err) {
     console.error('Erro ao carregar perfil:', err);
+  } finally {
+    document.body.style.opacity = '1';
   }
 };
 
