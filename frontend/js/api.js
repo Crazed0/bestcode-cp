@@ -11,16 +11,16 @@ function checkAuth() {
 
 // Configura dados do utilizador na UI
 function setupUserUI() {
-  const username = localStorage.getItem('bcp_username') || 'Utilizador';
-  const role = localStorage.getItem('bcp_role') || 'Admin';
+  const username = localStorage.getItem('bcp_username') || '';
+  const role = localStorage.getItem('bcp_role') || '';
 
   const userEl = document.getElementById('sidebar-username');
   const roleEl = document.getElementById('sidebar-role');
   const avatarEl = document.getElementById('user-avatar');
 
-  if (userEl) userEl.innerText = username;
-  if (roleEl) roleEl.innerText = role.toUpperCase();
-  if (avatarEl) avatarEl.innerText = username.charAt(0).toUpperCase();
+  if (userEl) userEl.innerText = username || '...';
+  if (roleEl) roleEl.innerText = role ? role.toUpperCase() : '...';
+  if (avatarEl) avatarEl.innerText = username ? username.charAt(0).toUpperCase() : '...';
 }
 
 // Exibe notificações flutuantes (Toasts)
@@ -109,6 +109,7 @@ async function apiRequest(endpoint, method = 'GET', body = null, isMultipart = f
     // Tratamento de expiração de token ou falta de autorização
     if (response.status === 401 || response.status === 403) {
       localStorage.clear();
+      window.isRedirecting = true;
       window.location.href = '/login';
       return null;
     }

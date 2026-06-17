@@ -249,6 +249,16 @@ server {
         proxy_cache_bypass \$http_upgrade;
     }
 
+    # Clean login path
+    location = /login {
+        try_files /login.html =404;
+    }
+
+    # Redirect direct .html requests to clean path
+    location = /login.html {
+        return 301 /login;
+    }
+
     # Tratamento para SPA (redireciona rotas para o index.html)
     location / {
         try_files \$uri \$uri/ /index.html;

@@ -2030,9 +2030,11 @@ window.loadUserProfile = async function() {
       const sidebarUsername = document.getElementById('sidebar-username');
       const sidebarRole = document.getElementById('sidebar-role');
       
-      // Atualiza sidebar
+      // Atualiza sidebar e salva no localStorage para cache
       if (sidebarUsername) sidebarUsername.innerText = data.username;
       if (sidebarRole) sidebarRole.innerText = data.role === 'admin' ? 'Administrador' : 'Cliente';
+      localStorage.setItem('bcp_username', data.username);
+      localStorage.setItem('bcp_role', data.role === 'admin' ? 'Admin' : 'Cliente');
       
       if (gmail && data.avatarUrl) {
         if (avatarContainer) avatarContainer.innerHTML = `<img src="${data.avatarUrl}" alt="Avatar" style="width:100%; height:100%; object-fit:cover;">`;
@@ -2057,7 +2059,9 @@ window.loadUserProfile = async function() {
   } catch (err) {
     console.error('Erro ao carregar perfil:', err);
   } finally {
-    document.body.style.opacity = '1';
+    if (!window.isRedirecting) {
+      document.body.style.opacity = '1';
+    }
   }
 };
 
