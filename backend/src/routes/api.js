@@ -855,7 +855,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
       avatarUrl = `https://www.gravatar.com/avatar/${hash}?d=identicon&s=150`;
     }
 
-    const profileData = { id: user.id, username: user.username, role: user.role, gmail: user.gmail, avatarUrl };
+    const pmaPath = process.env.PMA_PATH || '/phpmyadmin';
+    const profileData = { id: user.id, username: user.username, role: user.role, gmail: user.gmail, avatarUrl, pmaPath };
     
     if (redisClient.isReady) {
       await redisClient.setEx(cacheKey, 3600, JSON.stringify(profileData)); // Cache por 1 hora

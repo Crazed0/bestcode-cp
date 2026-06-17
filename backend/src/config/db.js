@@ -159,6 +159,9 @@ try {
     // Salva as credenciais em um arquivo local para o instalador ler e exibir
     const bootInfoPath = path.resolve(__dirname, '../../first-boot.txt');
     fs.writeFileSync(bootInfoPath, `USER: root\nPASSWORD: ${randomPass}\n`, 'utf8');
+    try {
+      fs.chmodSync(bootInfoPath, 0o600);
+    } catch (e) {}
 
     console.log(`\n===================================================`);
     console.log(`🔑 CREDENCIAIS DO ADMINISTRADOR INICIAL (ROOT)`);

@@ -743,7 +743,7 @@ async function accessDbSSO(id) {
     showToast('A gerar sessão segura no phpMyAdmin...', 'info');
     const data = await apiPost('/databases/sso', { id });
     if (data && data.token) {
-      const ssoUrl = `${window.location.protocol}//${window.location.host}/phpmyadmin/signon.php?token=${data.token}`;
+      const ssoUrl = `${window.location.protocol}//${window.location.host}${window.pmaPath || '/phpmyadmin'}/signon.php?token=${data.token}`;
       window.open(ssoUrl, '_blank');
     }
   } catch (err) {}
@@ -1980,6 +1980,7 @@ window.loadUserProfile = async function() {
   try {
     const data = await apiGet('/profile');
     if (data) {
+      window.pmaPath = data.pmaPath || '/phpmyadmin';
       const idEl = document.getElementById('profile-id-display');
       const userEl = document.getElementById('profile-username-display');
       const roleEl = document.getElementById('profile-role-badge');

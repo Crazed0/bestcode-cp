@@ -47,7 +47,21 @@ function execCommand(command) {
       return resolve({ stdout: `Success mock execution for: ${command}`, stderr: '' });
     }
 
-    exec(command, (error, stdout, stderr) => {
+    let cmdToRun = command;
+    try {
+      const os = require('os');
+      const currentUser = os.userInfo().username;
+      if (currentUser !== 'root') {
+        const privilegedCmds = ['systemctl', 'ufw', 'fail2ban-client', 'certbot', 'nginx', 'mysql', 'mariadb', 'chown', 'rm', 'crontab', 'ln'];
+        const trimmed = command.trim();
+        const firstWord = trimmed.split(' ')[0];
+        if (privilegedCmds.includes(firstWord) && !trimmed.startsWith('sudo')) {
+          cmdToRun = 'sudo ' + command;
+        }
+      }
+    } catch (e) {}
+
+    exec(cmdToRun, (error, stdout, stderr) => {
       if (error) {
         resolve({ error, stdout, stderr });
       } else {

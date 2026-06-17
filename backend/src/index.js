@@ -29,14 +29,15 @@ const PORT = process.env.PORT || 3000;
 
 // Proxy transparente do phpMyAdmin para o Nginx (porta 80) no ambiente de desenvolvimento
 // DEVE vir ANTES dos body-parsers para que o stream de dados da requisição (req) não seja consumido.
-app.use('/phpmyadmin', (req, res) => {
+const pmaPath = process.env.PMA_PATH || '/phpmyadmin';
+app.use(pmaPath, (req, res) => {
   const headers = { ...req.headers };
   headers['host'] = '127.0.0.1';
 
   const proxyReq = http.request({
     host: '127.0.0.1',
     port: 80,
-    path: `/phpmyadmin${req.url}`,
+    path: `${pmaPath}${req.url}`,
     method: req.method,
     headers: headers
   }, (proxyRes) => {

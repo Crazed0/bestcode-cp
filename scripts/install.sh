@@ -121,9 +121,32 @@ chmod +x /opt/bestcode-cp/scripts/update.sh
 # Garante que o Git aceita o diretório como confiável para atualizações do root
 git config --global --add safe.directory /opt/bestcode-cp
 
-# Ajustando permissões
-chown -R root:root /opt/bestcode-cp
+# 3. Criação do utilizador bcp e configuração de permissões
+echo -e "${YELLOW}Configurando utilizador bcp e permissões restritas...${NC}"
+id -u bcp &>/dev/null || useradd -r -m -s /bin/bash bcp
+usermod -aG docker bcp 2>/dev/null || true
+
+# Permite que o utilizador bcp configure o Nginx e o web root
+mkdir -p /var/www
+chown -R root:bcp /var/www
+chmod -R 775 /var/www
+
+mkdir -p /etc/nginx/sites-available /etc/nginx/sites-enabled
+chown -R root:bcp /etc/nginx/sites-available /etc/nginx/sites-enabled
+chmod -R 775 /etc/nginx/sites-available /etc/nginx/sites-enabled
+
+# Configura regras sudoers exclusivas para o utilizador bcp (segurança reforçada)
+cat <<EOF > /etc/sudoers.d/bestcode-cp
+bcp ALL=(ALL) NOPASSWD: /usr/sbin/ufw, /sbin/ufw, /usr/bin/fail2ban-client, /usr/bin/certbot, /usr/bin/systemctl, /bin/systemctl, /usr/sbin/nginx, /usr/bin/mysql, /usr/bin/mariadb, /usr/bin/chown, /bin/chown, /usr/bin/rm, /bin/rm, /usr/bin/crontab, /usr/bin/ln, /bin/ln
+EOF
+chmod 440 /etc/sudoers.d/bestcode-cp
+
+# Ajustando permissões do diretório do painel
+chown -R bcp:bcp /opt/bestcode-cp
 chmod -R 755 /opt/bestcode-cp
+chmod -R 700 /opt/bestcode-cp/backend
+chmod -R 700 /opt/bestcode-cp/daemon
+git config --global --add safe.directory /opt/bestcode-cp
 
 # 4. Instalando dependências do Backend e do Daemon
 echo -e "${YELLOW}[4/9] Instalando dependências da API do Painel e do Daemon...${NC}"
@@ -142,6 +165,10 @@ unzip -q /tmp/pma.zip -d /usr/share/
 mv /usr/share/phpMyAdmin-${PMA_VERSION}-all-languages /usr/share/phpmyadmin
 rm /tmp/pma.zip
 
+# Gera o caminho aleatório do phpMyAdmin
+PMA_SUFFIX=$(openssl rand -hex 4)
+PMA_PATH="/pma-${PMA_SUFFIX}"
+
 # Cria pasta temporária para o phpMyAdmin
 mkdir -p /usr/share/phpmyadmin/tmp
 chmod 777 /usr/share/phpmyadmin/tmp
@@ -154,7 +181,7 @@ cat <<EOF > /usr/share/phpmyadmin/config.inc.php
 \$i++;
 \$cfg['Servers'][\$i]['auth_type'] = 'signon';
 \$cfg['Servers'][\$i]['SignonSession'] = 'BestCodeSignonSession';
-\$cfg['Servers'][\$i]['SignonURL'] = '/phpmyadmin/signon.php';
+\$cfg['Servers'][\$i]['SignonURL'] = '${PMA_PATH}/signon.php';
 \$cfg['Servers'][\$i]['host'] = '127.0.0.1';
 \$cfg['Servers'][\$i]['compress'] = false;
 \$cfg['Servers'][\$i]['AllowNoPassword'] = false;
@@ -169,19 +196,19 @@ chmod 644 /usr/share/phpmyadmin/signon.php
 # 6. Configuração do Nginx (Servidor Web Principal)
 echo -e "${YELLOW}[6/9] Configurando o Nginx...${NC}"
 
-# Cria arquivo de bloco de servidor Nginx para o phpMyAdmin global
+# Cria arquivo de bloco de servidor Nginx para o phpMyAdmin global com alias aleatório
 cat <<EOF > /etc/nginx/snippets/phpmyadmin.conf
-location /phpmyadmin {
+location ${PMA_PATH} {
     alias /usr/share/phpmyadmin/;
     index index.php index.html index.htm;
-    location ~ ^/phpmyadmin/(.+\.php)$ {
+    location ~ ^${PMA_PATH}/(.+\.php)$ {
         alias /usr/share/phpmyadmin/\$1;
         fastcgi_pass unix:/run/php/php-fpm.sock;
         fastcgi_index index.php;
         fastcgi_param SCRIPT_FILENAME \$request_filename;
         include fastcgi_params;
     }
-    location ~* ^/phpmyadmin/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
+    location ~* ^${PMA_PATH}/(.+\.(jpg|jpeg|gif|css|png|js|ico|html|xml|txt))$ {
         alias /usr/share/phpmyadmin/\$1;
     }
 }
@@ -229,6 +256,9 @@ EOF
 ln -sf /etc/nginx/sites-available/bestcode-cp /etc/nginx/sites-enabled/bestcode-cp
 rm -f /etc/nginx/sites-enabled/default
 
+# Gera segredo aleatório do Daemon (segurança reforçada)
+DAEMON_SECRET=$(openssl rand -base64 24 | tr -d '/+=')
+
 # 7. Configuração dos Serviços Systemd do Painel e Daemon
 echo -e "${YELLOW}[7/9] Configurando serviços systemd do Painel e Daemon (Wings)...${NC}"
 cat <<EOF > /etc/systemd/system/bestcode-cp.service
@@ -238,11 +268,11 @@ After=network.target mariadb.service nginx.service
 
 [Service]
 Type=simple
-User=root
+User=bcp
 WorkingDirectory=/opt/bestcode-cp/backend
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
-Environment=NODE_ENV=production PORT=3000 JWT_SECRET=$(openssl rand -base64 32)
+Environment=NODE_ENV=production PORT=3000 JWT_SECRET=$(openssl rand -base64 32) PMA_PATH=${PMA_PATH}
 
 [Install]
 WantedBy=multi-user.target
@@ -259,7 +289,7 @@ User=root
 WorkingDirectory=/opt/bestcode-cp/daemon
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
-Environment=NODE_ENV=production DAEMON_PORT=8080 DAEMON_SECRET=bcp-daemon-node-secret-key-2026
+Environment=NODE_ENV=production DAEMON_PORT=8080 DAEMON_SECRET=${DAEMON_SECRET}
 
 [Install]
 WantedBy=multi-user.target
@@ -343,6 +373,17 @@ fi
 
 # Aguarda o serviço iniciar e criar o banco/credenciais
 sleep 5
+
+# Garante permissões restritas e seguras nos ficheiros criados
+chmod 600 /opt/bestcode-cp/backend/database.db 2>/dev/null || true
+chown bcp:bcp /opt/bestcode-cp/backend/database.db 2>/dev/null || true
+chmod 600 /opt/bestcode-cp/first-boot.txt 2>/dev/null || true
+chown bcp:bcp /opt/bestcode-cp/first-boot.txt 2>/dev/null || true
+
+# Salva a chave secreta do Daemon Wings num ficheiro seguro do root
+echo "$DAEMON_SECRET" > /opt/bestcode-cp/daemon-secret.txt
+chmod 600 /opt/bestcode-cp/daemon-secret.txt
+
 FIRST_BOOT_FILE="/opt/bestcode-cp/first-boot.txt"
 ROOT_PASSWORD="Falha ao carregar senha gerada automaticamente."
 
@@ -372,6 +413,11 @@ echo -e ""
 echo -e "🔑 CREDENCIAIS DO ADMINISTRADOR INICIAL:"
 echo -e "👤 Utilizador: ${GREEN}root${NC}"
 echo -e "🔒 Palavra-passe: ${GREEN}${ROOT_PASSWORD}${NC}"
+echo -e ""
+echo -e "🛡️  CHAVES DE SEGURANÇA GERADAS (COPIE E GUARDE):"
+echo -e "🔑 Wings Daemon Secret: ${YELLOW}${DAEMON_SECRET}${NC}"
+echo -e "🌐 phpMyAdmin Alias (Aleatório): ${YELLOW}${PMA_PATH}${NC}"
+echo -e "*(Salvo e protegido no servidor em /opt/bestcode-cp/daemon-secret.txt)*"
 echo -e ""
 echo -e "⚠️  IMPORTANT: Configure o Google 2FA na aba de Utilizadores para máxima segurança."
 echo -e "O phpMyAdmin está integrado e acessível direto pelo painel de Banco de Dados."
