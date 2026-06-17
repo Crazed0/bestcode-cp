@@ -63,7 +63,7 @@ setInterval(() => {
             try {
               process.kill(pid, 'SIGSTOP');
             } catch (e) {
-              exec(`kill -STOP ${pid}`);
+              exec(`sudo kill -STOP ${pid}`);
             }
 
             // Regista nos logs do sistema
@@ -715,7 +715,7 @@ router.post('/system/processes/kill', authenticateToken, async (req, res) => {
     res.json({ message: `Processo ${pid} terminado com sucesso.` });
   } catch (error) {
     const { exec } = require('child_process');
-    exec(`kill -9 ${pid}`, (err) => {
+    exec(`sudo kill -9 ${pid}`, (err) => {
       if (err) {
         return res.status(500).json({ error: `Falha ao terminar processo ${pid}: ` + err.message });
       }
@@ -739,7 +739,7 @@ router.post('/system/processes/quarantine', authenticateToken, async (req, res) 
     res.json({ message: `Processo ${pid} colocado em quarentena (suspenso).` });
   } catch (error) {
     const { exec } = require('child_process');
-    exec(`kill -STOP ${pid}`, (err) => {
+    exec(`sudo kill -STOP ${pid}`, (err) => {
       if (err) {
         return res.status(500).json({ error: `Falha ao suspender processo ${pid}: ` + err.message });
       }
@@ -763,11 +763,11 @@ router.post('/system/processes/resume', authenticateToken, async (req, res) => {
     res.json({ message: `Processo ${pid} retirado da quarentena (retomado).` });
   } catch (error) {
     const { exec } = require('child_process');
-    exec(`kill -CONT ${pid}`, (err) => {
+    exec(`sudo kill -CONT ${pid}`, (err) => {
       if (err) {
         return res.status(500).json({ error: `Falha ao retomar processo ${pid}: ` + err.message });
       }
-      res.json({ message: `Processo ${pid} retomado via CLI.` });
+      res.json({ message: `Processo ${pid} retomar via CLI.` });
     });
   }
 });

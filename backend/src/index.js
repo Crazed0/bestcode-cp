@@ -55,12 +55,12 @@ app.use(pmaPath, (req, res) => {
 
 // Middleware global - Injeta cabeçalhos de segurança (CSP, X-Frame, XSS, nosniff)
 app.use((req, res, next) => {
-  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'no-referrer-when-downgrade');
   // Content-Security-Policy (CSP) robusto
-  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ws: wss: https://api.github.com https://raw.githubusercontent.com; frame-src https://accounts.google.com;");
+  res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ws: wss: https://api.github.com https://raw.githubusercontent.com; frame-src 'self' https://accounts.google.com;");
   next();
 });
 
@@ -228,8 +228,8 @@ wss.on('connection', (ws, request, user) => {
 
 
         const isWin = process.platform === 'win32';
-        const shell = isWin ? 'powershell.exe' : 'bash';
-        const args = isWin ? ['-NoLogo'] : [];
+        const shell = isWin ? 'powershell.exe' : 'sudo';
+        const args = isWin ? ['-NoLogo'] : ['bash'];
 
         console.log(`[WS] Cliente conectou ao console de root`);
         activeShell = spawn(shell, args, {
@@ -330,8 +330,8 @@ wss.on('connection', (ws, request, user) => {
           if (isWin) {
             activeShell.kill('SIGINT');
           } else {
-            // Envia SIGINT para os processos filhos da shell ativa (ex: ping)
-            const pkill = spawn('pkill', ['-INT', '-P', activeShell.pid.toString()]);
+            // Envia SIGINT para os processos filhos da shell ativa (ex: ping) via sudo
+            const pkill = spawn('sudo', ['pkill', '-INT', '-P', activeShell.pid.toString()]);
             pkill.on('error', (err) => {
               console.error('Erro ao executar pkill:', err);
               activeShell.kill('SIGINT');

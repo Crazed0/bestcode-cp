@@ -132,9 +132,14 @@ async function getEmailDnsRecords(req, res) {
     // Resolve o IP público da VPS para mostrar nos registros DNS recomendados
     let serverIp = 'IP_DO_SEU_SERVIDOR';
     try {
-      const { stdout } = await execCommand("curl -s --max-time 2 https://ipify.org || curl -s --max-time 2 https://ifconfig.me || hostname -I | awk '{print $1}'");
+      const { stdout } = await execCommand("curl -sL --max-time 2 https://api.ipify.org || curl -sL --max-time 2 https://ifconfig.me || hostname -I | awk '{print $1}'");
       if (stdout && stdout.trim()) {
-        serverIp = stdout.trim();
+        const ip = stdout.trim();
+        // Regex para validar IPv4
+        const ipv4Regex = /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/;
+        if (ipv4Regex.test(ip)) {
+          serverIp = ip;
+        }
       }
     } catch (ipErr) {}
 

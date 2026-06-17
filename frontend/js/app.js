@@ -147,7 +147,7 @@ document.addEventListener('DOMContentLoaded', () => {
   loadUserProfile();
   
   // Verifica se o usuário é admin para exibir o menu de utilizadores
-  const role = localStorage.getItem('bcp_role');
+  const role = (localStorage.getItem('bcp_role') || '').toLowerCase();
   if (role === 'admin') {
     const navUsers = document.getElementById('nav-item-users');
     if (navUsers) navUsers.style.display = '';
@@ -1315,7 +1315,7 @@ function setupForms() {
         showToast(data.message, 'success');
         closeModal('modal-setup-2fa');
         load2FAStatus();
-        if (localStorage.getItem('bcp_role') === 'admin') loadUsers(); // Atualiza tabela se for admin
+        if ((localStorage.getItem('bcp_role') || '').toLowerCase() === 'admin') loadUsers(); // Atualiza tabela se for admin
       }
     } catch (err) {}
   });
@@ -1430,7 +1430,7 @@ window.disableTwoFactor = async function() {
     if (data) {
       showToast(data.message, 'success');
       load2FAStatus();
-      if (localStorage.getItem('bcp_role') === 'admin') loadUsers(); // Atualiza tabela se for admin
+      if ((localStorage.getItem('bcp_role') || '').toLowerCase() === 'admin') loadUsers(); // Atualiza tabela se for admin
     }
   } catch (err) {}
 };
@@ -2124,7 +2124,7 @@ window.loadUserProfile = async function() {
       if (sidebarUsername) sidebarUsername.innerText = data.username;
       if (sidebarRole) sidebarRole.innerText = data.role === 'admin' ? 'Administrador' : 'Cliente';
       localStorage.setItem('bcp_username', data.username);
-      localStorage.setItem('bcp_role', data.role === 'admin' ? 'Admin' : 'Cliente');
+      localStorage.setItem('bcp_role', data.role ? data.role.toLowerCase() : '');
       
       if (gmail && data.avatarUrl) {
         if (avatarContainer) avatarContainer.innerHTML = `<img src="${data.avatarUrl}" alt="Avatar" style="width:100%; height:100%; object-fit:cover;">`;
@@ -2643,7 +2643,7 @@ window.checkPanelVersion = async function() {
     if (data) {
       versionEl.innerText = `v${data.localVersion}`;
       
-      const role = localStorage.getItem('bcp_role');
+      const role = (localStorage.getItem('bcp_role') || '').toLowerCase();
       if (data.updateAvailable && role === 'admin') {
         // Se a versão mudou mostra a nova; caso contrário indica que há commits novos
         const novoLabel = (data.remoteVersion && data.remoteVersion !== data.localVersion)
