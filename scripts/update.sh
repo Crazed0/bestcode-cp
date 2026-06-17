@@ -205,6 +205,8 @@ EOF
     echo "Configurando SMTP/IMAP no Roundcube..."
     # Limpa configurações antigas do BCP se existirem
     sed -i '/\/\/ BCP Mail Server Integration/Q' /etc/roundcube/config.inc.php
+    # Remove a tag de fecho do PHP se existir no fim do ficheiro para podermos anexar com segurança
+    sed -i 's/?>//g' /etc/roundcube/config.inc.php
     
     cat <<'EOF' >> /etc/roundcube/config.inc.php
 

@@ -45,7 +45,7 @@ async function createDatabase(req, res) {
   // Sanitização simples (apenas letras, números e underlines)
   const safeDbName = dbName.replace(/[^a-zA-Z0-9_]/g, '');
   const safeDbUser = dbUser.replace(/[^a-zA-Z0-9_]/g, '');
-  const safeDbHost = (dbHost || 'localhost').trim().replace(/[^a-zA-Z0-9_\.\-%]/g, '');
+  const safeDbHost = (dbHost || 'localhost').trim().replace(/[^a-zA-Z0-9_\.%\-]/g, '');
 
   if (!safeDbName || !safeDbUser || !safeDbHost) {
     return res.status(400).json({ error: 'Nome de banco, usuário ou host contém caracteres inválidos.' });
