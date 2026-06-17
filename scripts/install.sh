@@ -128,11 +128,11 @@ chmod -R 755 /opt/bestcode-cp
 # 4. Instalando dependências do Backend e do Daemon
 echo -e "${YELLOW}[4/9] Instalando dependências da API do Painel e do Daemon...${NC}"
 cd /opt/bestcode-cp/backend
-npm install --omit=dev
+npm install --prefer-offline --no-audit --no-fund --omit=dev
 
 echo -e "Instalando dependências do Wings Daemon..."
 cd /opt/bestcode-cp/daemon
-npm install --omit=dev
+npm install --prefer-offline --no-audit --no-fund --omit=dev
 
 # 5. Instalação e Configuração do phpMyAdmin com Autologin (SSO)
 echo -e "${YELLOW}[5/9] Instalando e configurando o phpMyAdmin...${NC}"
@@ -334,6 +334,7 @@ systemctl restart nginx
 systemctl restart mariadb
 systemctl restart postfix
 systemctl restart dovecot
+systemctl restart bestcode-cp || true
 systemctl restart bestcode-cp-daemon || true
 PHP_SERVICE=$(basename $(ls /lib/systemd/system/php*-fpm.service | head -n 1) .service 2>/dev/null || echo "")
 if [ -n "$PHP_SERVICE" ]; then
@@ -341,7 +342,7 @@ if [ -n "$PHP_SERVICE" ]; then
 fi
 
 # Aguarda o serviço iniciar e criar o banco/credenciais
-sleep 2
+sleep 5
 FIRST_BOOT_FILE="/opt/bestcode-cp/first-boot.txt"
 ROOT_PASSWORD="Falha ao carregar senha gerada automaticamente."
 

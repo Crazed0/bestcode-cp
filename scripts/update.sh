@@ -18,13 +18,26 @@ echo "Limpando alterações locais e baixando última versão do GitHub..."
 git fetch --all
 git reset --hard origin/main
 
-echo "Instalando dependências do Backend..."
-cd backend
-npm install --omit=dev
+# Função para rodar npm install apenas se package.json ou package-lock.json mudaram
+run_npm_install_if_needed() {
+  local dir=$1
+  cd "/opt/bestcode-cp/$dir" || return
+  
+  local hash_file=".package_hash"
+  local current_hash
+  current_hash=$(sha256sum package.json package-lock.json 2>/dev/null || md5sum package.json package-lock.json 2>/dev/null || echo "none")
 
-echo "Instalando dependências do Wings Daemon..."
-cd ../daemon
-npm install --omit=dev
+  if [ -d "node_modules" ] && [ -f "$hash_file" ] && [ "$(cat "$hash_file")" = "$current_hash" ]; then
+    echo "Dependências de $dir já estão na versão correta. Pulando npm install..."
+  else
+    echo "Instalando dependências de $dir..."
+    npm install --prefer-offline --no-audit --no-fund --omit=dev
+    echo "$current_hash" > "$hash_file"
+  fi
+}
+
+run_npm_install_if_needed "backend"
+run_npm_install_if_needed "daemon"
 
 echo "Reiniciando serviços do painel..."
 if systemctl list-units --type=service | grep -q "bestcode-cp.service"; then
