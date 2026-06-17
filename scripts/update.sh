@@ -130,6 +130,9 @@ EOF
   postconf -e "smtpd_sasl_path = private/auth"
   postconf -e "smtpd_sasl_auth_enable = yes"
   postconf -e "smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination"
+  postconf -e "inet_interfaces = all"
+  postconf -e "inet_protocols = all"
+  postconf -e "myhostname = $(hostname -f 2>/dev/null || hostname || echo localhost)"
 
   # Configura o Dovecot para autenticar com base no banco do BestCode CP
   cat <<EOF > /etc/dovecot/dovecot-sqlite.conf.ext
@@ -232,8 +235,20 @@ $config['smtp_conn_options'] = array(
 EOF
   fi
 
-  # Reinicia os serviços de e-mail para aplicar as alterações
-  systemctl restart postfix dovecot || true
+  # Garante que o MariaDB/MySQL aceita conexões remotas
+  echo "Configurando MariaDB/MySQL para conexões remotas..."
+  mkdir -p /etc/mysql/mariadb.conf.d /etc/mysql/conf.d
+  cat <<EOF > /etc/mysql/mariadb.conf.d/99-bcp-mysql.cnf
+[mysqld]
+bind-address = 0.0.0.0
+EOF
+  cat <<EOF > /etc/mysql/conf.d/99-bcp-mysql.cnf
+[mysqld]
+bind-address = 0.0.0.0
+EOF
+
+  # Reinicia os serviços de e-mail e banco de dados para aplicar as alterações
+  systemctl restart postfix dovecot mariadb 2>/dev/null || systemctl restart postfix dovecot mysql 2>/dev/null || systemctl restart postfix dovecot || true
 fi
 
 # Corrige e atualiza a configuração do Nginx do painel com cabeçalhos de segurança e sem loops (de forma dinâmica)
@@ -484,11 +499,12 @@ if [ "$1" = "--nginx-only" ]; then
   exit 0
 fi
 
-# Garante que tráfego na interface local (loopback) é permitido no firewall
+# Garante que tráfego na interface local (loopback) e banco de dados remoto é permitido no firewall
 if command -v ufw >/dev/null 2>&1; then
   if ufw status | grep -q "Status: active"; then
-    echo "Garantindo regra de loopback no firewall (UFW)..."
+    echo "Garantindo regra de loopback e porta de banco de dados no firewall (UFW)..."
     ufw allow in on lo >/dev/null 2>&1 || true
+    ufw allow 3306/tcp >/dev/null 2>&1 || true
     ufw reload >/dev/null 2>&1 || true
   fi
 fi

@@ -422,6 +422,9 @@ postconf -e "smtpd_sasl_type = dovecot"
 postconf -e "smtpd_sasl_path = private/auth"
 postconf -e "smtpd_sasl_auth_enable = yes"
 postconf -e "smtpd_recipient_restrictions = permit_mynetworks, permit_sasl_authenticated, reject_unauth_destination"
+postconf -e "inet_interfaces = all"
+postconf -e "inet_protocols = all"
+postconf -e "myhostname = $(hostname -f 2>/dev/null || hostname || echo localhost)"
 
 # Configura o Dovecot para autenticar com base no banco do BestCode CP
 cat <<EOF > /etc/dovecot/dovecot-sqlite.conf.ext
@@ -535,7 +538,20 @@ ufw allow 443/tcp     # HTTPS (Nginx/Painel SSL)
 ufw allow 25/tcp      # SMTP (E-mail envio)
 ufw allow 587/tcp     # SMTP seguro
 ufw allow 993/tcp     # IMAP SSL (E-mail recebimento)
+ufw allow 3306/tcp    # MariaDB/MySQL
 ufw --force enable
+
+# Garante que o MariaDB/MySQL aceita conexões remotas
+echo -e "${YELLOW}Configurando MariaDB/MySQL para conexões remotas...${NC}"
+mkdir -p /etc/mysql/mariadb.conf.d /etc/mysql/conf.d
+cat <<EOF > /etc/mysql/mariadb.conf.d/99-bcp-mysql.cnf
+[mysqld]
+bind-address = 0.0.0.0
+EOF
+cat <<EOF > /etc/mysql/conf.d/99-bcp-mysql.cnf
+[mysqld]
+bind-address = 0.0.0.0
+EOF
 
 # Reinicia todos os serviços
 echo -e "${YELLOW}Reiniciando serviços...${NC}"
@@ -564,7 +580,7 @@ for i in $(seq 1 60); do
 done
 
 # Garante permissões restritas e seguras nos ficheiros criados
-chmod 600 /opt/bestcode-cp/backend/database.db 2>/dev/null || true
+chmod 660 /opt/bestcode-cp/backend/database.db 2>/dev/null || true
 chown bcp:bcp /opt/bestcode-cp/backend/database.db 2>/dev/null || true
 chmod 600 /opt/bestcode-cp/first-boot.txt 2>/dev/null || true
 chown bcp:bcp /opt/bestcode-cp/first-boot.txt 2>/dev/null || true

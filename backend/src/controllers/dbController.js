@@ -63,12 +63,18 @@ async function createDatabase(req, res) {
     }
 
     // 1. Criar o banco e o usuário no MySQL do sistema
-    const sqlCommands = `
+    let sqlCommands = `
       CREATE DATABASE IF NOT EXISTS \`${safeDbName}\`;
       CREATE USER IF NOT EXISTS '${safeDbUser}'@'${safeDbHost}' IDENTIFIED BY '${dbPass}';
       GRANT ALL PRIVILEGES ON \`${safeDbName}\`.* TO '${safeDbUser}'@'${safeDbHost}';
-      FLUSH PRIVILEGES;
     `;
+    if (safeDbHost !== 'localhost' && safeDbHost !== '127.0.0.1') {
+      sqlCommands += `
+        CREATE USER IF NOT EXISTS '${safeDbUser}'@'localhost' IDENTIFIED BY '${dbPass}';
+        GRANT ALL PRIVILEGES ON \`${safeDbName}\`.* TO '${safeDbUser}'@'localhost';
+      `;
+    }
+    sqlCommands += `\nFLUSH PRIVILEGES;`;
     await runMysqlQuery(sqlCommands);
 
     // 2. Salvar no SQLite do painel
@@ -103,6 +109,9 @@ async function deleteDatabase(req, res) {
     // Apenas remove o usuário MySQL associado se não for um usuário do sistema/root
     if (!reservedUsers.includes(db_user.toLowerCase())) {
       sqlCommands.push(`DROP USER IF EXISTS '${db_user}'@'${dbHost}';`);
+      if (dbHost !== 'localhost' && dbHost !== '127.0.0.1') {
+        sqlCommands.push(`DROP USER IF EXISTS '${db_user}'@'localhost';`);
+      }
     }
     
     await runMysqlQuery(sqlCommands.join('\n'));
@@ -174,10 +183,15 @@ async function changeDatabasePassword(req, res) {
     const dbHost = db_host || 'localhost';
 
     // 1. Atualizar a senha no MySQL do sistema
-    const sqlCommands = `
+    let sqlCommands = `
       ALTER USER '${db_user}'@'${dbHost}' IDENTIFIED BY '${newPass}';
-      FLUSH PRIVILEGES;
     `;
+    if (dbHost !== 'localhost' && dbHost !== '127.0.0.1') {
+      sqlCommands += `
+        ALTER USER '${db_user}'@'localhost' IDENTIFIED BY '${newPass}';
+      `;
+    }
+    sqlCommands += `\nFLUSH PRIVILEGES;`;
     await runMysqlQuery(sqlCommands);
 
     // 2. Atualizar no SQLite
