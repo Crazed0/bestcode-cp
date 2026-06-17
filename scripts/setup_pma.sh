@@ -67,8 +67,14 @@ else
     echo "AVISO: Socket PHP-FPM não foi gerado automaticamente."
 fi
 
-# Cria a configuração do bloco do Nginx do BestCode CP (Porta 80 e proxy reverso da API)
-sudo cat <<EOF > /etc/nginx/sites-available/bestcode-cp
+# Cria/atualiza a configuração do bloco do Nginx do BestCode CP com o snippet do phpMyAdmin
+if [ -f "/opt/bestcode-cp/scripts/update.sh" ]; then
+    echo "=== Formatando Nginx com o atualizador do painel ==="
+    bash /opt/bestcode-cp/scripts/update.sh --nginx-only
+else
+    # Fallback caso o script de atualização não exista
+    echo "=== Configurando Nginx padrão (fallback) ==="
+    sudo cat <<EOF > /etc/nginx/sites-available/bestcode-cp
 server {
     listen 80;
     server_name _;
@@ -78,24 +84,34 @@ server {
 
     include snippets/phpmyadmin.conf;
 
-    # Backend API e WebSocket Proxy
-    location /api {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "Upgrade";
-        proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
+    # Cabeçalhos de Segurança (Security Headers)
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "no-referrer-when-downgrade" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ws: wss: https://api.github.com https://raw.githubusercontent.com; frame-src https://accounts.google.com;" always;
+
+    # Redireciona acessos diretos a .html no browser para URL limpa (evita loop interno)
+    if (\$request_uri ~* "/login\.html") {
+        return 301 /login;
     }
 
-    # Clean login path
+    # Clean login path (evita cair no SPA e gerar loop de redirecionamento)
     location = /login {
         try_files /login.html =404;
     }
 
-    # Redirect direct .html requests to clean path
-    location = /login.html {
-        return 301 /login;
+    # Backend API e WebSocket Proxy (sem barra final no proxy_pass)
+    location /api {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host \$host;
+        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
     }
 
     # Tratamento para SPA (redireciona rotas para o index.html)
@@ -104,6 +120,7 @@ server {
     }
 }
 EOF
+fi
 
 # Habilita o site bestcode-cp e desabilita o default
 sudo rm -f /etc/nginx/sites-enabled/default

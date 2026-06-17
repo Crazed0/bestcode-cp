@@ -86,8 +86,15 @@ systemctl reload nginx
 # 2. Executa o Certbot para obter o SSL grátis da Let's Encrypt
 echo -e "\033[0;33mSolicitando certificado SSL via Certbot para $DOMAIN...\033[0;m"
 certbot --nginx -d "$DOMAIN" -d "www.$DOMAIN" --non-interactive --agree-tos --register-unsafely-without-email
+CERTBOT_STATUS=$?
 
-if [ $? -eq 0 ]; then
+# 3. Formata e limpa a configuração para garantir os cabeçalhos de segurança e evitar loops
+if [ -f "/opt/bestcode-cp/scripts/update.sh" ]; then
+  echo -e "\033[0;33mFormatando a configuração do Nginx para garantir segurança e prevenir loops...\033[0;m"
+  bash /opt/bestcode-cp/scripts/update.sh --nginx-only
+fi
+
+if [ $CERTBOT_STATUS -eq 0 ]; then
   echo -e "\033[0;32m==================================================\033[0;m"
   echo -e "\033[0;32m🎉 SSL ATIVADO E CONFIGURADO COM SUCESSO!\033[0;m"
   echo -e "\033[0;32m==================================================\033[0;m"
