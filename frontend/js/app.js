@@ -126,6 +126,14 @@ window.filterLogsOutput = function() {
   });
 };
 
+// Limpa apenas a visualização dos logs no ecrã (não apaga o ficheiro de log no servidor)
+window.clearLogsUI = function() {
+  const terminal = document.getElementById('logs-terminal-box');
+  if (terminal) terminal.innerHTML = '';
+  const filter = document.getElementById('logs-filter');
+  if (filter) filter.value = '';
+};
+
 // Inicialização principal
 document.addEventListener('DOMContentLoaded', () => {
   setupNavigation();
@@ -371,7 +379,10 @@ function connectWebSocket() {
   if (!token) return;
 
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const wsUrl = `${protocol}//${window.location.host}?token=${token}`;
+  // Liga via /api: em produção o Nginx só faz proxy de WebSocket nessa location
+  // (com os headers de Upgrade). O backend ignora o path e lê o token da query,
+  // por isso funciona tanto atrás do Nginx (Debian) como direto no Node (WSL/dev).
+  const wsUrl = `${protocol}//${window.location.host}/api?token=${token}`;
 
   wsConnection = new WebSocket(wsUrl);
 
