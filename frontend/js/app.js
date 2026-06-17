@@ -213,7 +213,27 @@ window.handleRouting = function() {
   }
   const tabId = path;
 
+  // Fecho do console / editor ao navegar para outra página
+  const previousTab = window.currentTab;
+  window.currentTab = tabId;
 
+  if (previousTab === 'game-console' || previousTab === 'site-console') {
+    if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+      wsConnection.send(JSON.stringify({ type: 'close_console' }));
+    }
+    if (remoteConsoleWs) {
+      try {
+        remoteConsoleWs.close();
+      } catch (e) {}
+      remoteConsoleWs = null;
+    }
+  }
+  if (previousTab === 'files') {
+    if (typeof window.closeEmbeddedEditor === 'function') {
+      window.closeEmbeddedEditor();
+    }
+    window.activeFmContext = null;
+  }
 
   const menuItems = document.querySelectorAll('.nav-item');
   const panes = document.querySelectorAll('.tab-pane');
@@ -221,7 +241,7 @@ window.handleRouting = function() {
   
   // Encontra o item de menu correspondente
   const matchingItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
-  if (!matchingItem && tabId !== 'profile') {
+  if (!matchingItem && tabId !== 'profile' && tabId !== 'files' && tabId !== 'game-console' && tabId !== 'site-console') {
     // Se o path for inválido/desconhecido, redireciona para o dashboard
     window.history.replaceState(null, '', '/dashboard');
     handleRouting();
@@ -249,8 +269,16 @@ window.handleRouting = function() {
     }
   });
 
-  if (tabId === 'profile' && pageTitle) {
-    pageTitle.innerText = 'Meu Perfil';
+  if (pageTitle) {
+    if (tabId === 'profile') {
+      pageTitle.innerText = 'Meu Perfil';
+    } else if (tabId === 'files') {
+      pageTitle.innerText = 'Gestor de Arquivos';
+    } else if (tabId === 'game-console') {
+      pageTitle.innerText = 'Console do Servidor';
+    } else if (tabId === 'site-console') {
+      pageTitle.innerText = 'Console do Site';
+    }
   }
 
   // Exibe o painel correspondente
@@ -770,7 +798,7 @@ window.goToDirectory = function(rootPath, domain) {
   const titleEl = document.getElementById('fm-modal-title');
   if (titleEl) titleEl.innerText = `Gestor de Arquivos - Site: ${domain || 'Site'}`;
   loadDirectory(rootPath);
-  openModal('modal-files');
+  switchContextTab('files');
 };
 
 // ==========================================
@@ -1602,7 +1630,7 @@ window.openGameConsole = function(id, name, hostPort, status, containerId, ramLi
   window.selectedGameServerDockerId = containerId;
   window.selectedGameServerRamLimit = ramLimit || 1024;
 
-  openModal('modal-game-console');
+  switchContextTab('game-console');
   loadGameConsole(id, name);
 };
 
@@ -1788,7 +1816,7 @@ window.goToGameFiles = function() {
     if (titleEl) titleEl.innerText = `Gestor de Arquivos - Servidor: ${window.selectedGameServerName}`;
   }
   loadDirectory('');
-  openModal('modal-files');
+  switchContextTab('files');
 };
 
 function startGameStatsPolling(id) {
@@ -2024,7 +2052,7 @@ window.handleRootConsoleInput = function(e) {
 
 window.openSiteConsole = function(domain) {
   window.activeSiteConsoleDomain = domain;
-  openModal('modal-site-console');
+  switchContextTab('site-console');
 
   const titleEl = document.getElementById('site-console-domain');
   if (titleEl) titleEl.innerText = domain;

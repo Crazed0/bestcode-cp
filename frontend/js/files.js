@@ -376,8 +376,11 @@ async function openFileInEditor(filePath) {
     const ext = filePath.split('.').pop().toLowerCase();
     const language = fileExtensionMap[ext] || 'plaintext';
 
-    // Abre o modal de tela cheia
-    openModal('modal-monaco-editor');
+    // Configura a UI do editor integrado
+    const editorToolbar = document.getElementById('fm-editor-toolbar');
+    const editorPlaceholder = document.getElementById('fm-editor-placeholder');
+    if (editorToolbar) editorToolbar.style.display = 'flex';
+    if (editorPlaceholder) editorPlaceholder.style.display = 'none';
 
     // Inicializa o Monaco com o conteúdo
     await initMonacoEditor('monaco-container', data.content, language);
@@ -427,39 +430,62 @@ async function saveCurrentFile() {
   }
 }
 
-window.closeEditorModal = function() {
-  closeModal('modal-monaco-editor');
-  
-  // Remove classe de tela cheia se estiver ativa
-  const modalBox = document.querySelector('#modal-monaco-editor .modal-box');
-  if (modalBox) {
-    modalBox.classList.remove('fullscreen-editor');
-  }
-  const btn = document.getElementById('btn-editor-fullscreen');
-  if (btn) {
-    btn.innerText = 'Full';
-    btn.style.borderColor = '';
-  }
+window.closeEmbeddedEditor = function() {
+  // Mostra a barra lateral e a barra de ferramentas do gestor de ficheiros de volta
+  const fmListContainer = document.getElementById('fm-file-list-container');
+  const fmToolbar = document.querySelector('.filemanager-toolbar');
+  if (fmListContainer) fmListContainer.style.display = 'flex';
+  if (fmToolbar) fmToolbar.style.display = 'flex';
+
+  // Habilita o placeholder do editor e esconde a toolbar do editor
+  const editorToolbar = document.getElementById('fm-editor-toolbar');
+  const editorPlaceholder = document.getElementById('fm-editor-placeholder');
+  if (editorToolbar) editorToolbar.style.display = 'none';
+  if (editorPlaceholder) editorPlaceholder.style.display = 'flex';
 
   if (monacoEditorInstance) {
     monacoEditorInstance.dispose();
     monacoEditorInstance = null;
   }
   currentEditingFilePath = '';
-  window.currentEditingNginxDomain = null;
-}
+  
+  if (window.currentEditingNginxDomain) {
+    window.currentEditingNginxDomain = null;
+    // Se estávamos a editar as configurações do Nginx de um site, regressa ao separador de sites
+    switchContextTab('sites');
+  }
+};
+
+window.closeEditorModal = function() {
+  window.closeEmbeddedEditor();
+};
 
 window.openNginxConfigModal = async function(domain) {
   try {
     window.currentEditingNginxDomain = domain;
     currentEditingFilePath = '';
-    document.getElementById('editor-file-path').innerText = `Nginx Config: ${domain}`;
     
     showToast('Lendo configuração do Nginx...', 'info');
     const data = await apiGet(`/sites/config?domain=${encodeURIComponent(domain)}`);
     if (!data) return;
 
-    openModal('modal-monaco-editor');
+    switchContextTab('files');
+
+    // Esconde a barra lateral e a barra de ferramentas do gestor de ficheiros
+    const fmListContainer = document.getElementById('fm-file-list-container');
+    const fmToolbar = document.querySelector('.filemanager-toolbar');
+    if (fmListContainer) fmListContainer.style.display = 'none';
+    if (fmToolbar) fmToolbar.style.display = 'none';
+
+    // Configura o título do arquivo
+    document.getElementById('editor-file-path').innerText = `Nginx Config: ${domain}`;
+
+    // Mostra a barra de ferramentas do editor e remove o placeholder
+    const editorToolbar = document.getElementById('fm-editor-toolbar');
+    const editorPlaceholder = document.getElementById('fm-editor-placeholder');
+    if (editorToolbar) editorToolbar.style.display = 'flex';
+    if (editorPlaceholder) editorPlaceholder.style.display = 'none';
+
     await initMonacoEditor('monaco-container', data.content, 'nginx');
   } catch (err) {
     console.error('Falha ao carregar Nginx config:', err);

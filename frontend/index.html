@@ -940,6 +940,167 @@
           </div>
         </div>
       </section>
+
+      <!-- ABA: GESTOR DE ARQUIVOS (VS Code Style) -->
+      <section class="tab-pane" id="tab-files" style="padding: 0; height: calc(100vh - 70px); overflow: hidden; display: flex; flex-direction: column;">
+        <!-- Header -->
+        <div class="modal-header" style="padding: 12px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: var(--bg-secondary);">
+          <h3 class="modal-title" id="fm-modal-title" style="margin: 0; font-size: 15px;">Gestor de Arquivos</h3>
+          <button class="modal-close" onclick="switchContextTab(window.activeFmContext && window.activeFmContext.type === 'game' ? 'game-servers' : 'sites')" style="background: none; border: none; font-size: 24px; color: var(--text-muted); cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+        
+        <div class="filemanager-layout" style="position: relative; border: none; border-radius: 0; height: 100%; display: flex; flex-direction: column; flex-grow: 1;" id="fm-drag-area">
+          <!-- Drag and Drop Overlay -->
+          <div id="fm-drag-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 12, 15, 0.9); z-index: 100; border: 2px dashed var(--color-primary); border-radius: 12px; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" width="48" height="48" style="animation: bounce 1s infinite;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"></path></svg>
+            <strong style="color: var(--color-primary); font-size: 16px;">Arraste e Solte os Ficheiros para Upload</strong>
+            <span style="color: var(--text-secondary); font-size: 12px;">Solte para iniciar o envio automático</span>
+          </div>
+
+          <!-- Barra de Ferramentas (Toolbar) -->
+          <div class="filemanager-toolbar" style="flex-shrink: 0; height: 50px; border-bottom: 1px solid var(--border-color); padding: 0 24px; display: flex; align-items: center; justify-content: space-between; background-color: var(--bg-secondary);">
+            <div class="filemanager-breadcrumb" id="fm-breadcrumb">
+              <span class="breadcrumb-item">root</span>
+            </div>
+            <div class="filemanager-actions">
+              <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px; height: 28px;" onclick="openCreateItemModal('file')">
+                + Ficheiro
+              </button>
+              <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px; height: 28px;" onclick="openCreateItemModal('folder')">
+                + Pasta
+              </button>
+              <button class="btn-secondary" style="padding: 4px 10px; font-size: 12px; height: 28px;" onclick="document.getElementById('file-upload-input').click()">
+                Subir Ficheiro
+              </button>
+              <input type="file" id="file-upload-input" style="display: none;" onchange="handleFileUpload(event)">
+              <button class="btn-icon-sm" onclick="reloadFiles()" title="Atualizar" style="height: 28px; width: 28px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Split Layout Panel -->
+          <div style="display: flex; flex-grow: 1; overflow: hidden; height: calc(100% - 50px);">
+            <!-- Left side: File Explorer -->
+            <div id="fm-file-list-container" style="width: 320px; min-width: 250px; max-width: 450px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; height: 100%; background: rgba(0,0,0,0.15); flex-shrink: 0;">
+              <div style="padding: 8px 12px; border-bottom: 1px solid var(--border-color); background: rgba(0,0,0,0.1); flex-shrink: 0;">
+                <input type="text" id="fm-search" class="form-input" placeholder="🔍 Filtrar ficheiros..." oninput="filterFmFiles()" style="width: 100%; padding: 4px 10px; font-size: 11px; height: 26px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+              </div>
+              <div class="filemanager-body" id="fm-file-list" style="flex-grow: 1; overflow-y: auto; height: 100%;">
+                <!-- Rendered dynamically -->
+              </div>
+            </div>
+            
+            <!-- Right side: Monaco Editor -->
+            <div id="fm-editor-container" style="flex-grow: 1; display: flex; flex-direction: column; height: 100%; background: #1e1e1e; min-width: 0;">
+              <!-- Editor Toolbar -->
+              <div class="editor-toolbar" id="fm-editor-toolbar" style="display: none; height: 42px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-color); padding: 0 16px; align-items: center; justify-content: space-between; flex-shrink: 0;">
+                <span class="editor-title" id="editor-file-path" style="font-size: 12px; font-family: var(--font-mono); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 50%;">/var/www/site/index.html</span>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                  <select id="editor-theme-select" class="form-select" onchange="changeEditorTheme()" style="padding: 2px 24px 2px 8px; font-size: 11px; height: 26px; background: rgba(0,0,0,0.2); border-radius: 4px; width: 110px;">
+                    <option value="vs-dark">Tema Escuro</option>
+                    <option value="vs">Tema Claro</option>
+                  </select>
+                  <button class="btn-secondary" style="padding: 2px 6px; font-size: 11px; height: 26px;" onclick="zoomEditor(1)" title="Aumentar Fonte">A+</button>
+                  <button class="btn-secondary" style="padding: 2px 6px; font-size: 11px; height: 26px;" onclick="zoomEditor(-1)" title="Diminuir Fonte">A-</button>
+                  <button class="btn-primary" style="padding: 4px 10px; font-size: 12px; height: 26px;" onclick="saveCurrentFile()">Salvar</button>
+                  <button class="btn-secondary" style="padding: 2px 6px; font-size: 11px; height: 26px; border-color: var(--color-danger); color: var(--color-danger);" onclick="closeEmbeddedEditor()" title="Fechar Ficheiro">&times;</button>
+                </div>
+              </div>
+              
+              <!-- Canvas Area -->
+              <div style="flex-grow: 1; position: relative; height: 100%; min-width: 0;">
+                <div id="fm-editor-placeholder" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); gap: 12px; font-size: 13px; background: #111522; z-index: 5;">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48" style="opacity: 0.3;"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                  <span>Selecione um ficheiro no explorador para editar</span>
+                </div>
+                <div id="monaco-container" style="width: 100%; height: 100%; background: #1e1e1e;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA: CONSOLE DO SERVIDOR DE JOGO -->
+      <section class="tab-pane" id="tab-game-console" style="overflow-y: hidden; height: calc(100vh - 70px); padding: 0; display: flex; flex-direction: column;">
+        <div class="modal-header" style="padding: 12px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: var(--bg-secondary);">
+          <h3 class="modal-title" style="margin: 0; font-size: 15px;">Console do Servidor: <span id="game-console-servername">Nenhum</span></h3>
+          <button class="modal-close" onclick="switchContextTab('game-servers')" style="background: none; border: none; font-size: 24px; color: var(--text-muted); cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 20px; display: grid; grid-template-columns: 2.5fr 1fr; gap: 20px; overflow: hidden; height: calc(100% - 50px); flex-grow: 1; background: var(--bg-primary);">
+          <!-- Coluna 1: Console Terminal -->
+          <div style="display: flex; flex-direction: column; height: 100%;">
+            <div class="terminal-container" id="game-console-box" style="flex-grow: 1; font-family: var(--font-mono); background: #000; color: #00d2ff; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; line-height: 1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.8);">
+              <div style="color: #666;">Carregando logs do container...</div>
+            </div>
+            <div class="console-input-wrapper" style="display: flex; margin-top: 12px; gap: 10px; flex-shrink: 0;">
+              <input type="text" id="game-console-input" class="form-input" placeholder="Digite um comando do console do jogo..." style="flex-grow: 1; font-family: var(--font-mono); font-size: 13px;" onkeydown="handleConsoleInput(event)">
+              <button class="btn-primary" id="game-console-send-btn" onclick="sendConsoleCommand()" style="padding: 0 20px;">Enviar</button>
+            </div>
+          </div>
+
+          <!-- Coluna 2: Recursos Ativos do Container -->
+          <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between; height: 100%; padding: 20px;">
+            <div>
+              <h3>Status em Tempo Real</h3>
+              <p style="font-size: 12px; color: var(--text-secondary); margin-top: 6px;">Uso de hardware pelo container Docker.</p>
+              
+              <div class="system-details-list" style="margin-top: 20px; gap: 14px;">
+                <div class="system-detail-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                  <div style="display: flex; justify-content: space-between; width: 100%;">
+                    <span>Uso de CPU</span>
+                    <strong id="game-console-cpu-val">0%</strong>
+                  </div>
+                  <div class="stat-progress-bar-bg" style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px;">
+                    <div id="game-console-cpu-bar" style="width: 0%; height: 100%; background: var(--color-primary); border-radius: 3px; transition: width 0.5s ease;"></div>
+                  </div>
+                </div>
+
+                <div class="system-detail-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                  <div style="display: flex; justify-content: space-between; width: 100%;">
+                    <span>Memória RAM</span>
+                    <strong id="game-console-ram-val">0 MB</strong>
+                  </div>
+                  <div class="stat-progress-bar-bg" style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px;">
+                    <div id="game-console-ram-bar" style="width: 0%; height: 100%; background: var(--color-secondary); border-radius: 3px; transition: width 0.5s ease;"></div>
+                  </div>
+                </div>
+
+                <div class="system-detail-item">
+                  <span>Porta Host</span>
+                  <strong id="game-console-port-val" style="font-family: var(--font-mono);">-</strong>
+                </div>
+
+                <div class="system-detail-item">
+                  <span>Docker ID</span>
+                  <strong id="game-console-dockerid-val" style="font-family: var(--font-mono); font-size: 11px;">-</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style="border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; flex-direction: column; gap: 10px;" id="game-console-status-actions">
+              <!-- Gerado via JS: botões de start/stop/restart baseados no estado -->
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ABA: CONSOLE DO SITE -->
+      <section class="tab-pane" id="tab-site-console" style="overflow-y: hidden; height: calc(100vh - 70px); padding: 0; display: flex; flex-direction: column;">
+        <div class="modal-header" style="padding: 12px 24px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; background: var(--bg-secondary);">
+          <h3 class="modal-title" style="margin: 0; font-size: 15px;">Console do Site: <span id="site-console-domain">Nenhum</span></h3>
+          <button class="modal-close" onclick="switchContextTab('sites')" style="background: none; border: none; font-size: 24px; color: var(--text-muted); cursor: pointer; line-height: 1;">&times;</button>
+        </div>
+        <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; overflow: hidden; height: calc(100% - 50px); flex-grow: 1; background: var(--bg-primary);">
+          <div class="terminal-container" id="site-console-box" tabindex="0" style="flex-grow: 1; font-family: var(--font-mono); background: #000; color: #00d2ff; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; line-height: 1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.8); outline: none;">
+            <div style="color: #666;">Conectando ao console do site...</div>
+          </div>
+          <div class="console-input-wrapper" style="display: flex; margin-top: 12px; gap: 10px; flex-shrink: 0;">
+            <input type="text" id="site-console-input" class="form-input" placeholder="Digite um comando shell do site (ex: npm install, composer install)..." style="flex-grow: 1; font-family: var(--font-mono); font-size: 13px;" onkeydown="handleSiteConsoleInput(event)">
+            <button class="btn-primary" id="site-console-send-btn" onclick="sendSiteConsoleCommand()" style="padding: 0 20px;">Enviar</button>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -1123,31 +1284,6 @@
     </div>
   </div>
 
-  <!-- Modal: Editor de Código Monaco (VS Code) - Ecrã Inteiro -->
-  <div class="modal-overlay" id="modal-monaco-editor">
-    <div class="modal-box modal-fullscreen">
-      <div class="editor-wrapper">
-        <div class="editor-toolbar">
-          <span class="editor-title" id="editor-file-path">/var/www/site/index.html</span>
-          <div style="display: flex; gap: 12px; align-items: center;">
-            <!-- Controles Monaco -->
-            <select id="editor-theme-select" class="form-select" onchange="changeEditorTheme()" style="padding: 4px 28px 4px 10px; font-size: 12px; height: 30px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-              <option value="vs-dark">Tema Escuro</option>
-              <option value="vs">Tema Claro</option>
-            </select>
-            <button class="btn-secondary" style="padding: 4px 8px; font-size: 12px; height: 30px;" onclick="zoomEditor(1)" title="Aumentar Fonte">A+</button>
-            <button class="btn-secondary" style="padding: 4px 8px; font-size: 12px; height: 30px;" onclick="zoomEditor(-1)" title="Diminuir Fonte">A-</button>
-            <button class="btn-secondary" style="padding: 4px 8px; font-size: 12px; height: 30px;" onclick="toggleEditorFullscreen()" id="btn-editor-fullscreen" title="Ecrã Inteiro">Full</button>
-            <button class="btn-primary" style="padding: 6px 12px; font-size: 13px;" onclick="saveCurrentFile()">
-              Salvar
-            </button>
-            <button class="modal-close" onclick="closeEditorModal()">&times;</button>
-          </div>
-        </div>
-        <div id="monaco-container"></div>
-      </div>
-    </div>
-  </div>
 
   <!-- Modal: Criar Utilizador -->
   <div class="modal-overlay" id="modal-create-user">
@@ -1323,55 +1459,6 @@
     </div>
   </div>
 
-  <!-- Modal: Gestor de Arquivos (File Manager) -->
-  <div class="modal-overlay" id="modal-files">
-    <div class="modal-box modal-fullscreen">
-      <div class="modal-header">
-        <h3 class="modal-title" id="fm-modal-title">Gestor de Arquivos</h3>
-        <button class="modal-close" onclick="closeModal('modal-files')">&times;</button>
-      </div>
-      <div class="modal-body" style="padding: 0; flex-grow: 1; display: flex; flex-direction: column; overflow: hidden;">
-        <div class="filemanager-layout" style="position: relative; border: none; border-radius: 0; height: 100%;" id="fm-drag-area">
-          <!-- Drag and Drop Overlay -->
-          <div id="fm-drag-overlay" style="display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(11, 12, 15, 0.9); z-index: 100; border: 2px dashed var(--color-primary); border-radius: 12px; flex-direction: column; align-items: center; justify-content: center; gap: 12px; pointer-events: none;">
-            <svg viewBox="0 0 24 24" fill="none" stroke="var(--color-primary)" stroke-width="2" width="48" height="48" style="animation: bounce 1s infinite;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"></path></svg>
-            <strong style="color: var(--color-primary); font-size: 16px;">Arraste e Solte os Ficheiros para Upload</strong>
-            <span style="color: var(--text-secondary); font-size: 12px;">Solte para iniciar o envio automático</span>
-          </div>
-
-          <!-- Barra de Ferramentas -->
-          <div class="filemanager-toolbar">
-            <div class="filemanager-breadcrumb" id="fm-breadcrumb">
-              <span class="breadcrumb-item">root</span>
-            </div>
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <input type="text" id="fm-search" class="form-input" placeholder="🔍 Filtrar ficheiros..." oninput="filterFmFiles()" style="width: 160px; padding: 4px 10px; font-size: 12px; height: 30px; background: rgba(0,0,0,0.2); border-radius: 6px;">
-            </div>
-            <div class="filemanager-actions">
-              <button class="btn-secondary" style="padding: 6px 12px; font-size: 13px;" onclick="openCreateItemModal('file')">
-                + Ficheiro
-              </button>
-              <button class="btn-secondary" style="padding: 6px 12px; font-size: 13px;" onclick="openCreateItemModal('folder')">
-                + Pasta
-              </button>
-              <button class="btn-secondary" style="padding: 6px 12px; font-size: 13px;" onclick="document.getElementById('file-upload-input').click()">
-                Subir Ficheiro
-              </button>
-              <input type="file" id="file-upload-input" style="display: none;" onchange="handleFileUpload(event)">
-              <button class="btn-icon-sm" onclick="reloadFiles()" title="Atualizar">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
-              </button>
-            </div>
-          </div>
-
-          <!-- Listagem de arquivos -->
-          <div class="filemanager-body" id="fm-file-list" style="height: calc(100% - 54px); overflow-y: auto;">
-            <!-- Renderizado dinamicamente pelo JS -->
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Modal: Criar Servidor de Jogo -->
   <div class="modal-overlay" id="modal-create-game-server">
@@ -1469,91 +1556,6 @@
 
   <!-- Toasts container -->
   <div id="toast-container"></div>
-
-  <!-- Modal: Console do Servidor de Jogo -->
-  <div class="modal-overlay" id="modal-game-console">
-    <div class="modal-box modal-fullscreen">
-      <div class="modal-header">
-        <h3 class="modal-title">Console do Servidor: <span id="game-console-servername">Nenhum</span></h3>
-        <button class="modal-close" onclick="closeModal('modal-game-console')">&times;</button>
-      </div>
-      <div class="modal-body" style="padding: 20px; display: grid; grid-template-columns: 2.5fr 1fr; gap: 20px; overflow: hidden; height: 100%;">
-        <!-- Coluna 1: Console Terminal -->
-        <div style="display: flex; flex-direction: column; height: 100%;">
-          <div class="terminal-container" id="game-console-box" style="flex-grow: 1; font-family: var(--font-mono); background: #000; color: #00d2ff; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; line-height: 1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.8);">
-            <div style="color: #666;">Carregando logs do container...</div>
-          </div>
-          <div class="console-input-wrapper" style="display: flex; margin-top: 12px; gap: 10px;">
-            <input type="text" id="game-console-input" class="form-input" placeholder="Digite um comando do console do jogo..." style="flex-grow: 1; font-family: var(--font-mono); font-size: 13px;" onkeydown="handleConsoleInput(event)">
-            <button class="btn-primary" id="game-console-send-btn" onclick="sendConsoleCommand()" style="padding: 0 20px;">Enviar</button>
-          </div>
-        </div>
-
-        <!-- Coluna 2: Recursos Ativos do Container -->
-        <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between; height: 100%; padding: 20px;">
-          <div>
-            <h3>Status em Tempo Real</h3>
-            <p style="font-size: 12px; color: var(--text-secondary); margin-top: 6px;">Uso de hardware pelo container Docker.</p>
-            
-            <div class="system-details-list" style="margin-top: 20px; gap: 14px;">
-              <div class="system-detail-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                <div style="display: flex; justify-content: space-between; width: 100%;">
-                  <span>Uso de CPU</span>
-                  <strong id="game-console-cpu-val">0%</strong>
-                </div>
-                <div class="stat-progress-bar-bg" style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px;">
-                  <div id="game-console-cpu-bar" style="width: 0%; height: 100%; background: var(--color-primary); border-radius: 3px; transition: width 0.5s ease;"></div>
-                </div>
-              </div>
-
-              <div class="system-detail-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
-                <div style="display: flex; justify-content: space-between; width: 100%;">
-                  <span>Memória RAM</span>
-                  <strong id="game-console-ram-val">0 MB</strong>
-                </div>
-                <div class="stat-progress-bar-bg" style="width: 100%; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px;">
-                  <div id="game-console-ram-bar" style="width: 0%; height: 100%; background: var(--color-secondary); border-radius: 3px; transition: width 0.5s ease;"></div>
-                </div>
-              </div>
-
-              <div class="system-detail-item">
-                <span>Porta Host</span>
-                <strong id="game-console-port-val" style="font-family: var(--font-mono);">-</strong>
-              </div>
-
-              <div class="system-detail-item">
-                <span>Docker ID</span>
-                <strong id="game-console-dockerid-val" style="font-family: var(--font-mono); font-size: 11px;">-</strong>
-              </div>
-            </div>
-          </div>
-
-          <div style="border-top: 1px solid var(--border-color); padding-top: 15px; display: flex; flex-direction: column; gap: 10px;" id="game-console-status-actions">
-            <!-- Gerado via JS: botões de start/stop/restart baseados no estado -->
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Console do Site -->
-  <div class="modal-overlay" id="modal-site-console">
-    <div class="modal-box modal-fullscreen">
-      <div class="modal-header">
-        <h3 class="modal-title">Console do Site: <span id="site-console-domain">Nenhum</span></h3>
-        <button class="modal-close" onclick="closeModal('modal-site-console')">&times;</button>
-      </div>
-      <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; overflow: hidden; height: 100%;">
-        <div class="terminal-container" id="site-console-box" tabindex="0" style="flex-grow: 1; font-family: var(--font-mono); background: #000; color: #00d2ff; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; overflow-y: auto; font-size: 12px; white-space: pre-wrap; line-height: 1.5; box-shadow: inset 0 0 10px rgba(0,0,0,0.8); outline: none;">
-          <div style="color: #666;">Conectando ao console do site...</div>
-        </div>
-        <div class="console-input-wrapper" style="display: flex; margin-top: 12px; gap: 10px;">
-          <input type="text" id="site-console-input" class="form-input" placeholder="Digite um comando shell do site (ex: npm install, composer install)..." style="flex-grow: 1; font-family: var(--font-mono); font-size: 13px;" onkeydown="handleSiteConsoleInput(event)">
-          <button class="btn-primary" id="site-console-send-btn" onclick="sendSiteConsoleCommand()" style="padding: 0 20px;">Enviar</button>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <!-- Modal Overlay de Atualização -->
   <div class="modal-overlay" id="modal-updating-overlay" style="display: none; background: rgba(0,0,0,0.9); z-index: 10000; align-items: center; justify-content: center; text-align: center;">
