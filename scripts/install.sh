@@ -28,7 +28,7 @@ apt update && apt upgrade -y
 
 # 2. Adicionando Repositórios Extras e Dependências
 echo -e "${YELLOW}[2/9] Configurando repositórios extras (PHP Sury, NodeSource)...${NC}"
-apt install -y curl wget git unzip zip ca-certificates gnupg lsb-release software-properties-common net-tools cron ufw fail2ban sqlite3
+apt install -y build-essential curl wget git unzip zip ca-certificates gnupg lsb-release software-properties-common net-tools cron ufw fail2ban sqlite3
 
 # Adicionar repositório PHP Sury para suporte a multi-versões
 if [ -f /etc/debian_version ]; then
@@ -351,18 +351,23 @@ if [ -f "$FIRST_BOOT_FILE" ]; then
 fi
 
 # Obtém o IP público ou local para exibição
-LOCAL_IP=$(hostname -I | awk '{print $1}')
-PUBLIC_IP=$(curl -s --max-time 3 https://api.ipify.org || curl -s --max-time 3 https://ifconfig.me || echo "")
+LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+PUBLIC_IP=$(curl -s --max-time 3 https://api.ipify.org || curl -s --max-time 3 https://ifconfig.me || wget -qO- --timeout=3 https://api.ipify.org 2>/dev/null || echo "")
+
 DISPLAY_IP="${PUBLIC_IP:-$LOCAL_IP}"
 if [ -z "$DISPLAY_IP" ]; then
-  DISPLAY_IP="IP_DO_SEU_SERVIDOR"
+  DISPLAY_IP="127.0.0.1"
 fi
 
 echo -e "${GREEN}==================================================================${NC}"
 echo -e "${GREEN}🎉 BESTCODE CONTROL PANEL INSTALADO COM SUCESSO!${NC}"
 echo -e "${GREEN}==================================================================${NC}"
 echo -e "Você já pode aceder ao seu painel via navegador através do IP do servidor:"
-echo -e "${BLUE}http://${DISPLAY_IP}/${NC}"
+if [ -n "$PUBLIC_IP" ] && [ -n "$LOCAL_IP" ] && [ "$PUBLIC_IP" != "$LOCAL_IP" ]; then
+  echo -e "${BLUE}http://${DISPLAY_IP}/${NC}  (Local: ${BLUE}http://${LOCAL_IP}/${NC})"
+else
+  echo -e "${BLUE}http://${DISPLAY_IP}/${NC}"
+fi
 echo -e ""
 echo -e "🔑 CREDENCIAIS DO ADMINISTRADOR INICIAL:"
 echo -e "👤 Utilizador: ${GREEN}root${NC}"
