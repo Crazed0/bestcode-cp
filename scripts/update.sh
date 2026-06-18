@@ -1,6 +1,7 @@
 #!/bin/bash
 # scripts/update.sh
-# Script de auto-atualização do BestCode Control Panel (BCP)
+# Exporta frontend não-interativo para evitar popups de debconf bloqueantes
+export DEBIAN_FRONTEND=noninteractive
 
 # Se não estiver a correr a cópia do /tmp, e não for apenas atualização do Nginx, copia e executa a partir do /tmp
 # Isso previne que o script seja modificado em disco enquanto corre (problema comum no git reset/pull)
@@ -284,6 +285,7 @@ location /roundcube {
 EOF
 
   # Inicia serviço FPM se necessário para gerar o socket e detecta o socket correto
+  systemctl start php8.3-fpm php8.2-fpm php8.1-fpm 2>/dev/null || systemctl start php-fpm 2>/dev/null || true
   PHP_FPM_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1)
   if [ -n "$PHP_FPM_SOCK" ]; then
       sed -i "s|fastcgi_pass unix:/run/php/php-fpm.sock;|fastcgi_pass unix:$PHP_FPM_SOCK;|" /etc/nginx/snippets/roundcube.conf 2>/dev/null || true

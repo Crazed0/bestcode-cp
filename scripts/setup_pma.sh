@@ -57,8 +57,8 @@ location /phpmyadmin {
 EOF
 
 # Inicia serviço FPM se necessário para gerar o socket
-sudo systemctl start php-fpm || sudo service php-fpm start || true
-PHP_FPM_SOCK=$(ls /run/php/php*-fpm.sock | head -n 1)
+sudo systemctl start php8.3-fpm php8.2-fpm php8.1-fpm php-fpm 2>/dev/null || sudo service php-fpm start 2>/dev/null || true
+PHP_FPM_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1 || echo "")
 
 if [ -n "$PHP_FPM_SOCK" ]; then
     echo "FPM Socket encontrado: $PHP_FPM_SOCK"

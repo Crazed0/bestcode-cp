@@ -10,7 +10,8 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
-NC='\033[0;m' # No Color
+NC='\033[0;m' # Exporta frontend não-interativo para evitar popups de debconf bloqueantes
+export DEBIAN_FRONTEND=noninteractive
 
 # Verifica se está rodando como root
 if [ "$EUID" -ne 0 ]; then
@@ -28,20 +29,33 @@ apt update && apt upgrade -y
 
 # 2. Adicionando Repositórios Extras e Dependências
 echo -e "${YELLOW}[2/9] Configurando repositórios extras (PHP Sury, NodeSource)...${NC}"
-apt install -y build-essential curl wget git unzip zip ca-certificates gnupg lsb-release software-properties-common net-tools cron ufw fail2ban sqlite3
-
-# Adicionar repositório PHP Sury para suporte a multi-versões
 if [ -f /etc/debian_version ]; then
+  # Debian: Não instala software-properties-common (específico do Ubuntu)
+  apt install -y build-essential curl wget git unzip zip ca-certificates gnupg lsb-release net-tools cron ufw fail2ban sqlite3
+  
   echo -e "Configurando repositório PHP Sury para Debian..."
   curl -sSL https://packages.sury.org/php/apt.gpg -o /etc/apt/trusted.gpg.d/sury-php.gpg
-  echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" > /etc/apt/sources.list.d/sury-php.list
+  CODENAME=$(lsb_release -sc 2>/dev/null)
+  if [ -z "$CODENAME" ]; then
+    CODENAME=$(. /etc/os-release && echo "$VERSION_CODENAME")
+  fi
+  if [ -z "$CODENAME" ]; then
+    CODENAME="bookworm"
+  fi
+  echo "deb https://packages.sury.org/php/ $CODENAME main" > /etc/apt/sources.list.d/sury-php.list
 else
+  # Ubuntu: Instala software-properties-common para add-apt-repository
+  apt install -y build-essential curl wget git unzip zip ca-certificates gnupg lsb-release software-properties-common net-tools cron ufw fail2ban sqlite3
+  
   echo -e "Configurando repositório PHP Ondrej para Ubuntu..."
   add-apt-repository -y ppa:ondrej/php
 fi
 
 # Configurar repositório NodeSource v20 LTS
-curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
+echo -e "Configurando repositório NodeSource v20 LTS..."
+mkdir -p /etc/apt/keyrings
+curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg 2>/dev/null || true
+echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_20.x nodistro main" > /etc/apt/sources.list.d/nodesource.list
 
 apt update
 
@@ -252,8 +266,8 @@ location /roundcube {
 EOF
 
 # Inicia serviço FPM se necessário para gerar o socket
-systemctl start php8.2-fpm || systemctl start php-fpm || true
-PHP_FPM_SOCK=$(ls /run/php/php*-fpm.sock | head -n 1)
+systemctl start php8.3-fpm php8.2-fpm php8.1-fpm 2>/dev/null || systemctl start php-fpm 2>/dev/null || true
+PHP_FPM_SOCK=$(ls /run/php/php*-fpm.sock 2>/dev/null | head -n 1 || echo "")
 if [ -n "$PHP_FPM_SOCK" ]; then
     echo -e "FPM Socket encontrado: $PHP_FPM_SOCK"
     sed -i "s|fastcgi_pass unix:/run/php/php-fpm.sock;|fastcgi_pass unix:$PHP_FPM_SOCK;|" /etc/nginx/snippets/phpmyadmin.conf
