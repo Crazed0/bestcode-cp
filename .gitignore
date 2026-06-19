@@ -8,6 +8,8 @@
 !.gitignore
 !scripts/
 !scripts/**
+!deploy.js
+!package.json
 
 # 3. Ignorar explicitamente dependências e builds (mesmo dentro de exceções, se aplicável)
 node_modules/

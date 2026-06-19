@@ -119,22 +119,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PARENT_DIR="$(dirname "$SCRIPT_DIR")"
 
 mkdir -p /opt/bestcode-cp
+mkdir -p /opt/bestcode-cp/scripts
 
-if [ -d "$PARENT_DIR/.git" ]; then
-  echo -e "Copiando repositório Git existente para /opt/bestcode-cp..."
-  # Copia todo o conteúdo incluindo o diretório oculto .git
-  cp -r "$PARENT_DIR/." /opt/bestcode-cp/
-else
-  echo -e "Clonando repositório Git em /opt/bestcode-cp..."
-  git clone https://github.com/Crazed0/bestcode-cp.git /opt/bestcode-cp
-fi
+echo -e "Descarregando scripts essenciais do repositório..."
+wget -qO /opt/bestcode-cp/scripts/update.sh https://raw.githubusercontent.com/Crazed0/bestcode-cp/main/scripts/update.sh
+wget -qO /opt/bestcode-cp/scripts/setup-panel-domain.sh https://raw.githubusercontent.com/Crazed0/bestcode-cp/main/scripts/setup-panel-domain.sh
+wget -qO /opt/bestcode-cp/scripts/phpmyadmin-signon.php https://raw.githubusercontent.com/Crazed0/bestcode-cp/main/scripts/phpmyadmin-signon.php
 
 # Torna os scripts utilitários executáveis
 chmod +x /opt/bestcode-cp/scripts/update.sh
 chmod +x /opt/bestcode-cp/scripts/setup-panel-domain.sh
-
-# Garante que o Git aceita o diretório como confiável para atualizações do root
-git config --global --add safe.directory /opt/bestcode-cp
 
 # 3. Criação do utilizador bcp e configuração de permissões
 echo -e "${YELLOW}Configurando utilizador bcp e permissões restritas...${NC}"
@@ -169,14 +163,8 @@ chmod -R 700 /opt/bestcode-cp/backend
 chmod -R 700 /opt/bestcode-cp/daemon
 git config --global --add safe.directory /opt/bestcode-cp
 
-# 4. Instalando dependências do Backend e do Daemon
-echo -e "${YELLOW}[4/9] Instalando dependências da API do Painel e do Daemon...${NC}"
-cd /opt/bestcode-cp/backend
-npm install --prefer-offline --no-audit --no-fund --omit=dev
-
-echo -e "Instalando dependências do Wings Daemon..."
-cd /opt/bestcode-cp/daemon
-npm install --prefer-offline --no-audit --no-fund --omit=dev
+# 4. (Pular a instalação do Backend/Daemon, será feito pelo deploy via SSH)
+echo -e "${YELLOW}[4/9] O código do Painel será instalado via SSH Deploy...${NC}"
 
 # 5. Instalação e Configuração do phpMyAdmin com Autologin (SSO)
 echo -e "${YELLOW}[5/9] Instalando e configurando o phpMyAdmin...${NC}"
@@ -580,24 +568,9 @@ if [ -n "$PHP_SERVICE" ]; then
     systemctl restart $PHP_SERVICE
 fi
 
-# Aguarda o painel arrancar e semear o admin (poll em vez de sleep fixo).
-# Avança assim que as credenciais estiverem prontas; teto de segurança de 60s
-# para servidores lentos, evitando "credenciais inválidas" logo após instalar.
-FIRST_BOOT_FILE="/opt/bestcode-cp/first-boot.txt"
-echo -e "${YELLOW}Aguardando o painel iniciar e gerar as credenciais...${NC}"
-for i in $(seq 1 60); do
-  if [ -f "$FIRST_BOOT_FILE" ] && grep -q "PASSWORD:" "$FIRST_BOOT_FILE" 2>/dev/null; then
-    echo -e "${GREEN}Painel pronto (após ${i}s).${NC}"
-    break
-  fi
-  sleep 1
-done
-
-# Garante permissões restritas e seguras nos ficheiros criados
+# Garante permissões restritas e seguras nos ficheiros base
 chmod 660 /opt/bestcode-cp/backend/database.db 2>/dev/null || true
 chown bcp:bcp /opt/bestcode-cp/backend/database.db 2>/dev/null || true
-chmod 600 /opt/bestcode-cp/first-boot.txt 2>/dev/null || true
-chown bcp:bcp /opt/bestcode-cp/first-boot.txt 2>/dev/null || true
 
 # Salva a chave secreta do Daemon Wings num ficheiro seguro do root
 echo "$DAEMON_SECRET" > /opt/bestcode-cp/daemon-secret.txt
@@ -614,12 +587,6 @@ if [ -f /etc/ssh/sshd_config ]; then
   systemctl restart ssh || systemctl restart sshd || true
 fi
 
-ROOT_PASSWORD="Falha ao carregar senha gerada automaticamente."
-
-if [ -f "$FIRST_BOOT_FILE" ]; then
-  ROOT_PASSWORD=$(grep "PASSWORD:" "$FIRST_BOOT_FILE" | cut -d' ' -f2)
-fi
-
 # Obtém o IP público ou local para exibição
 LOCAL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
 PUBLIC_IP=$(curl -s --max-time 3 https://api.ipify.org || curl -s --max-time 3 https://ifconfig.me || wget -qO- --timeout=3 https://api.ipify.org 2>/dev/null || echo "")
@@ -630,18 +597,17 @@ if [ -z "$DISPLAY_IP" ]; then
 fi
 
 echo -e "${GREEN}==================================================================${NC}"
-echo -e "${GREEN}🎉 BESTCODE CONTROL PANEL INSTALADO COM SUCESSO!${NC}"
+echo -e "${GREEN}🎉 INFRAESTRUTURA DO BESTCODE CP PREPARADA COM SUCESSO!${NC}"
 echo -e "${GREEN}==================================================================${NC}"
-echo -e "Você já pode aceder ao seu painel via navegador através do IP do servidor:"
-if [ -n "$PUBLIC_IP" ] && [ -n "$LOCAL_IP" ] && [ "$PUBLIC_IP" != "$LOCAL_IP" ]; then
-  echo -e "${BLUE}http://${DISPLAY_IP}/${NC}  (Local: ${BLUE}http://${LOCAL_IP}/${NC})"
-else
-  echo -e "${BLUE}http://${DISPLAY_IP}/${NC}"
-fi
+echo -e "Os servidores (Nginx, MariaDB, Postfix, Dovecot) estão prontos!"
 echo -e ""
-echo -e "🔑 CREDENCIAIS DO ADMINISTRADOR INICIAL:"
-echo -e "👤 Utilizador: ${GREEN}root${NC}"
-echo -e "🔒 Palavra-passe: ${GREEN}${ROOT_PASSWORD}${NC}"
+echo -e "⚠️  ${YELLOW}FALTA APENAS ENVIAR O CÓDIGO DO PAINEL${NC}"
+echo -e "Como o código é privado, vá ao seu PC local (onde tem o projeto original) e execute:"
+echo -e "${BLUE}npm run deploy${NC}"
+echo -e ""
+echo -e "Isso enviará os ficheiros de forma segura e iniciará o sistema automaticamente."
+echo -e "Após o deploy, a sua palavra-passe inicial ficará guardada no ficheiro:"
+echo -e "${YELLOW}/opt/bestcode-cp/first-boot.txt${NC}"
 echo -e ""
 echo -e "🛡️  CHAVES DE SEGURANÇA GERADAS (COPIE E GUARDE):"
 echo -e "🔑 Wings Daemon Secret: ${YELLOW}${DAEMON_SECRET}${NC}"
