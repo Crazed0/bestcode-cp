@@ -1,42 +1,22 @@
-# Node.js dependencies
-node_modules/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# 1. Ignorar tudo por defeito (para não enviar código-fonte para o GitHub público)
+*
+.*
+/*/
 
-# SQLite Database files (contains user credentials and panel data)
+# 2. Exceções: Permitir apenas ficheiros de documentação e scripts de deploy/instalação
+!README.md
+!.gitignore
+!scripts/
+!scripts/**
+
+# 3. Ignorar explicitamente dependências e builds (mesmo dentro de exceções, se aplicável)
+node_modules/
+dist/
+build/
+out/
+backend/
+frontend/
+daemon/
 *.db
 *.db-shm
 *.db-wal
-backend/database.db
-backend/database.db-shm
-backend/database.db-wal
-
-# Initial boot credentials (root password)
-first-boot.txt
-
-# Temp files and logs
-temp/
-logs/
-backend/temp/
-*.log
-
-# Environment configuration files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
-
-# IDEs and editors configurations
-.vscode/
-.idea/
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.swp
-
-# OS generated files
-.DS_Store
-Thumbs.db
