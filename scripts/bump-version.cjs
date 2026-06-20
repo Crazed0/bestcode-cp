@@ -5,8 +5,10 @@ const { execSync } = require('child_process');
 try {
   const pkgPath = path.resolve(__dirname, '../backend/package.json');
   if (!fs.existsSync(pkgPath)) {
-    console.error('[BUMP-VERSION] backend/package.json not found.');
-    process.exit(1);
+    // backend/ pode não existir neste checkout (ex.: repo público só com scripts).
+    // Não bloquear o commit por isso.
+    console.warn('[BUMP-VERSION] backend/package.json ausente — bump ignorado.');
+    process.exit(0);
   }
 
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
@@ -20,9 +22,15 @@ try {
     
     fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf8');
     console.log(`[BUMP-VERSION] Bumped backend version from ${oldVersion} to ${newVersion}`);
-    
-    // Auto-stage the changed package.json so it is included in the commit
-    execSync('git add backend/package.json');
+
+    // Tenta incluir o package.json no commit. Em repos onde backend/ está
+    // gitignored (ex.: repo público só de scripts), o git add falha — e isso
+    // NÃO deve bloquear o commit.
+    try {
+      execSync('git add backend/package.json', { stdio: 'ignore' });
+    } catch (e) {
+      console.warn('[BUMP-VERSION] backend/ não tracked aqui — bump não foi staged (ok).');
+    }
   } else {
     console.error('[BUMP-VERSION] Invalid version format in backend/package.json:', oldVersion);
     process.exit(1);
