@@ -459,6 +459,13 @@ dbpath = /opt/bestcode-cp/backend/database.db
 query = SELECT 1 FROM emails WHERE email_address='%s'
 EOF
 
+# IMPORTANTE: tirar o chroot do Postfix. Caso contrário, smtpd/trivial-rewrite/cleanup
+# correm dentro de /var/spool/postfix e NÃO vêem /opt/bestcode-cp/backend/database.db
+# (onde estão os virtual_mailbox_domains/_maps), falhando com "disk I/O error?" e a queue
+# nunca se entrega. Idempotente — só muda 'y' para 'n' na 5ª coluna do master.cf.
+awk 'BEGIN{OFS=" "} /^[a-z]/ && NF>=8 && $5=="y" { $5="n" } { print }' /etc/postfix/master.cf > /etc/postfix/master.cf.new \
+  && mv /etc/postfix/master.cf.new /etc/postfix/master.cf
+
 # Aplica parâmetros essenciais no /etc/postfix/main.cf (inclui SASL Auth via Dovecot e LMTP)
 postconf -e "virtual_mailbox_domains = sqlite:/etc/postfix/sqlite-virtual-mailbox-domains.cf"
 postconf -e "virtual_mailbox_maps = sqlite:/etc/postfix/sqlite-virtual-mailbox-maps.cf"
