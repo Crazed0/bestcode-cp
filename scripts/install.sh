@@ -132,6 +132,11 @@ PARENT_DIR="$(dirname "$SCRIPT_DIR")"
 
 mkdir -p /opt/bestcode-cp
 mkdir -p /opt/bestcode-cp/scripts
+# Cria as pastas alvo do deploy (backend/daemon/frontend) já vazias, para que
+# os chmod/chown/cat que se seguem não falhem na PRIMEIRA instalação (antes do
+# `npm run deploy` lá pôr o código). Numa reinstalação, estas pastas já existem
+# e o mkdir é no-op.
+mkdir -p /opt/bestcode-cp/backend /opt/bestcode-cp/daemon /opt/bestcode-cp/frontend
 
 echo -e "Descarregando scripts essenciais do repositório..."
 wget -qO /opt/bestcode-cp/scripts/update.sh https://raw.githubusercontent.com/Crazed0/bestcode-cp/main/scripts/update.sh
@@ -392,11 +397,13 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
+# Apenas ENABLE aqui — não START. Na primeira instalação o código ainda não está
+# no servidor (chega via `npm run deploy`); um `systemctl start` agora falharia
+# em loop até o deploy ocorrer. O deploy faz `systemctl restart` no fim, que
+# arranca os serviços com o código já presente. Em reinstalações, o restart
+# final desta script (mais abaixo) também trata disso.
 systemctl enable bestcode-cp
-systemctl start bestcode-cp
-
 systemctl enable bestcode-cp-daemon
-systemctl start bestcode-cp-daemon
 
 # 8. Configuração de Postfix e Dovecot com SQLite Virtual Maps
 echo -e "${YELLOW}[8/9] Configurando Integração de E-mail com SQLite...${NC}"
