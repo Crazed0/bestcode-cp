@@ -1,6 +1,15 @@
 #!/bin/bash
 # scripts/update.sh
-# Exporta frontend não-interativo para evitar popups de debconf bloqueantes
+# ------------------------------------------------------------------------------
+# MANUTENÇÃO DA INFRAESTRUTURA DO BESTCODE CP (NÃO atualiza o código do painel).
+#
+# Use `npm run deploy` na máquina do programador para atualizar o código.
+# Este script só re-aplica config externa: SSL custom, php-redis, postfix-sqlite,
+# Roundcube, user vmail, sudoers, virtual maps, Nginx, etc.
+#
+# Flags:
+#   --nginx-only   Re-aplica apenas a config Nginx do painel.
+# ------------------------------------------------------------------------------
 export DEBIAN_FRONTEND=noninteractive
 
 # Se não estiver a correr a cópia do /tmp, e não for apenas atualização do Nginx, copia e executa a partir do /tmp
@@ -24,14 +33,13 @@ if [ "$1" != "--nginx-only" ]; then
   echo "Iniciando atualização do BestCode CP..."
   
   cd /opt/bestcode-cp || { echo "Falha ao acessar diretório /opt/bestcode-cp"; exit 1; }
-  
-  # Garante que o git confia no diretório para rodar comandos como root
-  git config --global --add safe.directory /opt/bestcode-cp
-  
-  echo "Limpando alterações locais e baixando última versão do GitHub..."
-  git fetch --all
-  git reset --hard origin/main
-  
+
+  # NOTA: este script já NÃO faz git pull / git reset --hard.
+  # O código do painel chega via `npm run deploy` da máquina do programador (tar+SFTP);
+  # /opt/bestcode-cp não é um clone Git — um `git reset --hard origin/main` aqui
+  # apagaria o backend (que está gitignored no repo público) e destruiria a database.
+  # Para atualizar o código, corre `npm run deploy` no PC do programador.
+
   # Função para rodar npm install apenas se package.json ou package-lock.json mudaram
   run_npm_install_if_needed() {
     local dir=$1
