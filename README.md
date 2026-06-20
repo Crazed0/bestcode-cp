@@ -40,10 +40,11 @@ Depois, **do PC do programador** (onde o código privado está), enviar o painel
 
 ```bash
 # Variáveis OBRIGATÓRIAS (sem defaults — não há coordenadas da prod no repo):
-export BCP_SSH_HOST=ip-do-servidor
-export BCP_SSH_USER=bmw                  # ou outro user com sudo
-export BCP_SSH_PORT=2222                 # ou 22, conforme o SSH hardening
-export BCP_SUDO_PASS='password do sudo'  # se o user precisar de password
+export BCP_SSH_HOST=<ip-ou-host>
+export BCP_SSH_USER=<user-com-sudo>
+export BCP_SSH_PORT=<porta-ssh>          # default 22
+export BCP_SUDO_PASS='<password-sudo>'   # opcional, se o user precisar
+export BCP_SSH_KEY=~/.ssh/id_ed25519     # opcional, override da chave privada
 
 npm run deploy
 ```

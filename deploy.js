@@ -19,11 +19,15 @@ const SUDO_PASS = process.env.BCP_SUDO_PASS || "";
 if (!SSH_HOST || !SSH_USER) {
   console.error("❌ Faltam variáveis de ambiente obrigatórias.");
   console.error("   Define BCP_SSH_HOST e BCP_SSH_USER (e opcionalmente BCP_SSH_PORT, BCP_SUDO_PASS).");
-  console.error("   Exemplo: BCP_SSH_HOST=meu.servidor BCP_SSH_USER=admin BCP_SSH_PORT=2222 BCP_SUDO_PASS='...' npm run deploy");
+  console.error("   Exemplo: BCP_SSH_HOST=meu.servidor BCP_SSH_USER=meu_user BCP_SSH_PORT=22 BCP_SUDO_PASS='...' npm run deploy");
   process.exit(1);
 }
 
-const privateKeyPath = path.join(os.homedir(), '.ssh', 'id_ed25519');
+// Permite override do caminho da chave privada via BCP_SSH_KEY (útil quando a
+// chave para esta máquina vive fora do default ~/.ssh/id_ed25519).
+const privateKeyPath = process.env.BCP_SSH_KEY
+  ? process.env.BCP_SSH_KEY.replace(/^~/, os.homedir())
+  : path.join(os.homedir(), '.ssh', 'id_ed25519');
 
 console.log("==================================================");
 console.log("   Iniciando Deploy Direto via SSH (BestCode CP)  ");
