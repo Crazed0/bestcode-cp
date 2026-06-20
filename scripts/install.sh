@@ -125,6 +125,20 @@ DEBIAN_FRONTEND=noninteractive apt install -y pure-ftpd-mysql
 echo -e "${YELLOW}Instalando BorgBackup e Restic...${NC}"
 apt install -y borgbackup restic
 
+# WireGuard + qrencode — o painel tem uma página WireGuard que cria o hub e os peers.
+# Sem estes pacotes, o backend tenta auto-instalar em runtime na 1ª utilização (lento
+# e falha se não houver internet). Pré-instalar deixa a página WG pronta a usar.
+echo -e "${YELLOW}Instalando WireGuard, wireguard-tools e qrencode...${NC}"
+DEBIAN_FRONTEND=noninteractive apt install -y wireguard wireguard-tools qrencode
+
+# Updates automáticos de segurança — referenciado pelo doc de hardening.
+# Mantém-se a postura segura entre reinstalações sem ação manual.
+echo -e "${YELLOW}Instalando unattended-upgrades (security updates automáticos)...${NC}"
+DEBIAN_FRONTEND=noninteractive apt install -y unattended-upgrades
+# Ativa o ficheiro de auto-upgrades sem prompt interativo
+echo 'APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";' > /etc/apt/apt.conf.d/20auto-upgrades
+
 # 3. Configurando Diretórios do BestCode CP
 echo -e "${YELLOW}[3/9] Configurando arquivos do BestCode CP...${NC}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
