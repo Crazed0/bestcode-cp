@@ -459,6 +459,16 @@ dbpath = /opt/bestcode-cp/backend/database.db
 query = SELECT 1 FROM emails WHERE email_address='%s'
 EOF
 
+# Reencaminhamento de email (forward). O Postfix consulta esta query ANTES do
+# virtual_mailbox_maps: se devolver algo, é a lista para onde entregar.
+#   - keep_local_copy=1 → retorna 'email_address, forward_to' (mantém cópia local)
+#   - keep_local_copy=0 → retorna apenas 'forward_to' (puro redirect)
+#   - forward_to vazio  → query devolve NULL e o mail é entregue normalmente
+cat <<EOF > /etc/postfix/sqlite-virtual-alias-maps.cf
+dbpath = /opt/bestcode-cp/backend/database.db
+query = SELECT CASE WHEN keep_local_copy=1 THEN email_address || ',' || forward_to ELSE forward_to END FROM emails WHERE email_address='%s' AND forward_to IS NOT NULL AND forward_to != ''
+EOF
+
 # IMPORTANTE: tirar o chroot do Postfix. Caso contrário, smtpd/trivial-rewrite/cleanup
 # correm dentro de /var/spool/postfix e NÃO vêem /opt/bestcode-cp/backend/database.db
 # (onde estão os virtual_mailbox_domains/_maps), falhando com "disk I/O error?" e a queue
@@ -469,6 +479,7 @@ awk 'BEGIN{OFS=" "} /^[a-z]/ && NF>=8 && $5=="y" { $5="n" } { print }' /etc/post
 # Aplica parâmetros essenciais no /etc/postfix/main.cf (inclui SASL Auth via Dovecot e LMTP)
 postconf -e "virtual_mailbox_domains = sqlite:/etc/postfix/sqlite-virtual-mailbox-domains.cf"
 postconf -e "virtual_mailbox_maps = sqlite:/etc/postfix/sqlite-virtual-mailbox-maps.cf"
+postconf -e "virtual_alias_maps = sqlite:/etc/postfix/sqlite-virtual-alias-maps.cf"
 postconf -e "virtual_transport = lmtp:unix:private/dovecot-lmtp"
 postconf -e "smtpd_sasl_type = dovecot"
 postconf -e "smtpd_sasl_path = private/auth"
