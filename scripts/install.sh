@@ -1,8 +1,20 @@
 #!/bin/bash
 
 # ==============================================================================
-# SCRIPT DE INSTALAÇÃO AUTOMÁTICA DO BESTCODE CONTROL PANEL (BCP)
-# SISTEMA OPERACIONAL RECOMENDADO: Ubuntu 22.04 LTS / 24.04 LTS ou Debian 12
+# SCRIPT DE INSTALAÇÃO / REINSTALAÇÃO DO BESTCODE CONTROL PANEL (BCP)
+# SO RECOMENDADO: Ubuntu 22.04/24.04 LTS ou Debian 12
+# ------------------------------------------------------------------------------
+# IDEMPOTENTE: pode correr-se as vezes que forem precisas. Reconfigura tudo
+# (serviços, segurança, firewall) sem partir o que já está.
+#
+# PRESERVA OS DADOS (nunca apaga):
+#   - /opt/bestcode-cp/backend/database.db*  (sites, utilizadores, BDs, emails, projetos…)
+#   - /opt/bestcode-cp/backend/.jwt-secret + .secret-key  (segredo JWT + chave de cifra → sessões/segredos mantêm-se)
+#   - /var/www/*            (ficheiros dos sites)
+#   - /var/lib/mysql/*      (bases de dados reais)
+#   - /var/mail/vhosts/*    (caixas de correio)
+# Só o CÓDIGO e a CONFIGURAÇÃO são reinstalados. A segurança (permissões por site,
+# cifra de segredos, audit log, etc.) é (re)aplicada automaticamente no arranque do painel.
 # ==============================================================================
 
 # Cores para output
@@ -31,7 +43,7 @@ apt update && apt upgrade -y
 echo -e "${YELLOW}[2/9] Configurando repositórios extras (PHP Sury, NodeSource)...${NC}"
 if [ -f /etc/debian_version ]; then
   # Debian: Não instala software-properties-common (específico do Ubuntu)
-  apt install -y build-essential curl wget git unzip zip ca-certificates gnupg lsb-release net-tools cron ufw fail2ban sqlite3
+  apt install -y build-essential curl wget git unzip zip p7zip-full unrar-free tar gzip bzip2 xz-utils ca-certificates gnupg lsb-release net-tools cron ufw fail2ban sqlite3
   
   echo -e "Configurando repositório PHP Sury para Debian..."
   curl -sSL https://packages.sury.org/php/apt.gpg -o /etc/apt/trusted.gpg.d/sury-php.gpg
@@ -45,7 +57,7 @@ if [ -f /etc/debian_version ]; then
   echo "deb https://packages.sury.org/php/ $CODENAME main" > /etc/apt/sources.list.d/sury-php.list
 else
   # Ubuntu: Instala software-properties-common para add-apt-repository
-  apt install -y build-essential curl wget git unzip zip ca-certificates gnupg lsb-release software-properties-common net-tools cron ufw fail2ban sqlite3
+  apt install -y build-essential curl wget git unzip zip p7zip-full unrar-free tar gzip bzip2 xz-utils ca-certificates gnupg lsb-release software-properties-common net-tools cron ufw fail2ban sqlite3
   
   echo -e "Configurando repositório PHP Ondrej para Ubuntu..."
   add-apt-repository -y ppa:ondrej/php
@@ -273,12 +285,13 @@ server {
     # Oculta versão do Nginx nos cabeçalhos de resposta
     server_tokens off;
 
-    # Cabeçalhos de Segurança (Security Headers)
+    # Cabeçalhos de Segurança (alinhados com os do painel; o backend reforça-os também)
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-Content-Type-Options "nosniff" always;
-    add_header X-XSS-Protection "1; mode=block" always;
-    add_header Referrer-Policy "no-referrer-when-downgrade" always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https://lh3.googleusercontent.com; connect-src 'self' ws: wss: https://api.github.com https://raw.githubusercontent.com; frame-src 'self' https://accounts.google.com;" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=(), magnetometer=(), accelerometer=(), gyroscope=(), interest-cohort=()" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://accounts.google.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; font-src 'self' data: https://fonts.gstatic.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; img-src 'self' data: blob: https://lh3.googleusercontent.com; connect-src 'self' wss: https://api.github.com https://raw.githubusercontent.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; frame-src 'self' https://accounts.google.com; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com; frame-ancestors 'self';" always;
 
     root /opt/bestcode-cp/frontend;
     index index.html;
@@ -332,11 +345,15 @@ After=network.target mariadb.service nginx.service
 
 [Service]
 Type=simple
-User=bcp
+# Corre como root: o painel cria utilizadores Unix por site, gere o nginx/PM2/fail2ban
+# e abre consolas isoladas (runuser) — operações que exigem privilégios de root.
+User=root
 WorkingDirectory=/opt/bestcode-cp/backend
 ExecStart=/usr/bin/node src/index.js
 Restart=on-failure
-Environment=NODE_ENV=production PORT=3000 JWT_SECRET=$(openssl rand -base64 32) PMA_PATH=${PMA_PATH}
+# NÃO definimos JWT_SECRET aqui: o painel gera/persiste um segredo aleatório em
+# backend/.jwt-secret (sobrevive a reinstalações → as sessões NÃO caem ao reinstalar).
+Environment=NODE_ENV=production PORT=3000 PMA_PATH=${PMA_PATH}
 # Ficheiro de overrides por instalação (opcional). Permite definir, p.ex.,
 # GOOGLE_CLIENT_ID=... sem editar este unit. O '-' torna-o opcional.
 EnvironmentFile=-/opt/bestcode-cp/backend/bcp.env
@@ -531,20 +548,91 @@ fi
 
 # 9. Firewall (UFW) e Fail2ban
 echo -e "${YELLOW}[9/9] Configurando Segurança e Firewall (UFW)...${NC}"
+# NOTA: a ES2 usa UFW porque o painel BestCode CP gere o firewall por aqui
+# (página de Segurança → abrir/fechar portas) e também o fail2ban. NÃO apliques
+# também a nftables.conf "crua" do documento mestre NESTA máquina — escolhe uma
+# só fonte de verdade. A nftables crua do doc é para a node1/local (sem painel).
 ufw default deny incoming
 ufw default allow outgoing
-ufw allow in on lo    # Permitir tráfego na interface local (loopback)
-ufw allow 22/tcp      # SSH
-ufw allow 80/tcp      # HTTP (Nginx/Painel)
-ufw allow 443/tcp     # HTTPS (Nginx/Painel SSL)
-ufw allow 25/tcp      # SMTP (E-mail envio)
-ufw allow 587/tcp     # SMTP seguro
-ufw allow 993/tcp     # IMAP SSL (E-mail recebimento)
-ufw allow 3306/tcp    # MariaDB/MySQL
+ufw allow in on lo                 # loopback
+
+# SSH — abre 22 E 2222 (rate-limited). O doc mestre move o SSH para 2222; abrir
+# ambas evita trancares-te fora numa reinstalação, seja qual for a porta ativa.
+ufw limit 22/tcp                   # SSH (porta default)
+ufw limit 2222/tcp                 # SSH (porta endurecida do doc)
+
+# Web — Nginx/Painel. Fica atrás de Cloudflare e o middleware do painel já bloqueia
+# acesso direto por IP (Host = IP → 403). Para fechar a origem SÓ ao Cloudflare,
+# vê o bloco OPCIONAL comentado no fim desta secção.
+ufw allow 80/tcp
+ufw allow 443/tcp
+
+# Mail (não passa por Cloudflare — usa sempre TLS)
+ufw allow 25/tcp                   # SMTP
+ufw allow 587/tcp                  # Submission (STARTTLS)
+ufw allow 465/tcp                  # SMTPS
+ufw allow 993/tcp                  # IMAPS
+ufw allow 995/tcp                  # POP3S
+
+# MariaDB/MySQL — NÃO exposta à internet. Só pela mesh WireGuard (interface wg0),
+# por isso o plugin CS2 (node1) liga pela mesh e a 3306 não aparece no Shodan.
+# Restringir por interface (wg0) funciona seja qual for a subnet (10.0.0.x ou 10.8.0.x).
+# Para acesso PÚBLICO/IP-FIXO a uma DB, abre o IP específico (o painel faz isto na
+# página de Segurança):  ufw allow from <IP> to any port 3306
+ufw allow in on wg0 to any port 3306
+
+# node_exporter (monitorização Prometheus na 'local') — só pela mesh
+ufw allow in on wg0 to any port 9100
+
 ufw --force enable
 
-# Garante que o MariaDB/MySQL aceita conexões remotas
-echo -e "${YELLOW}Configurando MariaDB/MySQL para conexões remotas...${NC}"
+# --- OPCIONAL: restringir a Web (80/443) só ao Cloudflare (defesa em profundidade) ---
+# Corre UMA vez depois de teres o domínio em Cloudflare. Mantém a lista atualizada.
+# ATENÇÃO: isto bloqueia o acesso direto por IP — só conseguirás chegar via domínio CF.
+#   ufw delete allow 80/tcp; ufw delete allow 443/tcp
+#   for ip in $(curl -s https://www.cloudflare.com/ips-v4) $(curl -s https://www.cloudflare.com/ips-v6); do
+#     ufw allow from "$ip" to any port 80,443 proto tcp
+#   done
+#   ufw reload
+
+# Fail2ban: protege o SSH (e mais) contra brute-force. O painel gere o ignoreip por aqui.
+echo -e "${YELLOW}Configurando fail2ban (jail.local)...${NC}"
+if [ ! -f /etc/fail2ban/jail.local ]; then
+  cat <<EOF > /etc/fail2ban/jail.local
+[DEFAULT]
+# Nunca banir o loopback nem a mesh (acrescenta aqui IPs de confiança, ex.: IP de deploy)
+ignoreip = 127.0.0.1/8 ::1 10.0.0.0/24 10.8.0.0/24
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+backend  = systemd
+
+[sshd]
+enabled = true
+# Protege ambas as portas: a default e a endurecida (2222) do doc mestre
+port    = ssh,2222
+
+[nginx-http-auth]
+enabled = true
+
+[nginx-botsearch]
+enabled = true
+
+[postfix]
+enabled = true
+
+[dovecot]
+enabled = true
+EOF
+fi
+systemctl enable fail2ban 2>/dev/null || true
+systemctl restart fail2ban 2>/dev/null || true
+
+# MariaDB escuta em todas as interfaces (0.0.0.0). Quem REALMENTE chega à 3306 é
+# decidido pelo FIREWALL (UFW), não pelo bind — por defeito só a mesh wg0 (secção 9).
+# Bind a 0.0.0.0 (em vez de a um IP de mesh) evita o MariaDB falhar no arranque
+# quando a interface wg0 ainda não existe.
+echo -e "${YELLOW}Configurando MariaDB/MySQL (bind 0.0.0.0, acesso filtrado pelo UFW)...${NC}"
 mkdir -p /etc/mysql/mariadb.conf.d /etc/mysql/conf.d
 cat <<EOF > /etc/mysql/mariadb.conf.d/99-bcp-mysql.cnf
 [mysqld]
