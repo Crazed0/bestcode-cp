@@ -469,6 +469,20 @@ dbpath = /opt/bestcode-cp/backend/database.db
 query = SELECT CASE WHEN keep_local_copy=1 THEN email_address || ',' || forward_to ELSE forward_to END FROM emails WHERE email_address='%s' AND forward_to IS NOT NULL AND forward_to != ''
 EOF
 
+# postsrsd: Sender Rewriting Scheme. Necessário para FORWARD funcionar para
+# Gmail/Outlook/etc. Sem isto o envelope sender mantém-se (ex.: gmail.com) e
+# o destino faz SPF FAIL (porque 38.19.201.33 não está autorizado por gmail).
+# Com SRS: ao reencaminhar, sender é reescrito para SRS0=...=bestcode.pt → SPF passa.
+echo -e "${YELLOW}Instalando postsrsd (Sender Rewriting Scheme para forwards)...${NC}"
+DEBIAN_FRONTEND=noninteractive apt install -y postsrsd
+# Domínio do SRS = mesmo que myhostname (configurado mais abaixo) sem o "mail." prefix
+sed -i "s|^SRS_DOMAIN=.*|SRS_DOMAIN=$(hostname -d 2>/dev/null || echo localhost)|" /etc/default/postsrsd
+postconf -e "sender_canonical_maps = tcp:127.0.0.1:10001"
+postconf -e "sender_canonical_classes = envelope_sender"
+postconf -e "recipient_canonical_maps = tcp:127.0.0.1:10002"
+postconf -e "recipient_canonical_classes = envelope_recipient,header_recipient"
+systemctl enable --now postsrsd
+
 # IMPORTANTE: tirar o chroot do Postfix. Caso contrário, smtpd/trivial-rewrite/cleanup
 # correm dentro de /var/spool/postfix e NÃO vêem /opt/bestcode-cp/backend/database.db
 # (onde estão os virtual_mailbox_domains/_maps), falhando com "disk I/O error?" e a queue
